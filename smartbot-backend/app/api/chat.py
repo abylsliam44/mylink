@@ -5,7 +5,7 @@ from uuid import UUID
 import json
 from typing import Dict
 
-from app.db.session import get_db
+from app.db.session import get_db, AsyncSessionLocal
 from app.models.response import CandidateResponse, ResponseStatus
 from app.models.chat import SenderType
 from app.services.chat_service import ChatService
@@ -32,7 +32,7 @@ async def chat_websocket(
     
     try:
         # Get database session
-        async for db in get_db():
+        async with AsyncSessionLocal() as db:
             # Verify response exists
             result = await db.execute(
                 select(CandidateResponse).where(CandidateResponse.id == response_id)
@@ -172,8 +172,6 @@ async def chat_websocket(
                             "message": next_question,
                             "question_index": current_question_index
                         })
-            
-            break  # Exit the async for loop
     
     except WebSocketDisconnect:
         # Client disconnected

@@ -1,13 +1,13 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
 from uuid import UUID
-from typing import Optional, Dict, Any
+from typing import Optional, Union
 
 
 class VacancyBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     description: str = Field(..., min_length=1)
-    requirements: Optional[Dict[str, Any]] = None
+    requirements: Optional[str] = None
     location: str = Field(..., min_length=1)
     salary_min: Optional[int] = Field(None, ge=0)
     salary_max: Optional[int] = Field(None, ge=0)
@@ -20,7 +20,7 @@ class VacancyCreate(VacancyBase):
 class VacancyUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = Field(None, min_length=1)
-    requirements: Optional[Dict[str, Any]] = None
+    requirements: Optional[str] = None
     location: Optional[str] = Field(None, min_length=1)
     salary_min: Optional[int] = Field(None, ge=0)
     salary_max: Optional[int] = Field(None, ge=0)
