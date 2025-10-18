@@ -11,6 +11,8 @@ from app.db.session import get_db
 from app.models.vacancy import Vacancy
 from app.models.candidate import Candidate
 from app.models.response import CandidateResponse
+from app.models.candidate import Candidate as CandidateModel
+from app.services.ai.llm_client import get_llm
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
@@ -178,3 +180,50 @@ async def pipeline_screen_by_ids(body: PipelineByIdsInput, db: AsyncSession = De
                 pass
 
     return pipeline
+
+
+class EmployerAssistantBody(BaseModel):
+    vacancy_id: UUID
+    question: str
+
+
+@router.post("/employer/assistant")
+async def employer_assistant(body: EmployerAssistantBody, db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
+    """Answer employer questions about candidates for a vacancy using LLM and real scores."""
+    # Load responses with candidate names
+    q = (
+        select(CandidateResponse, CandidateModel)
+        .join(CandidateModel, CandidateResponse.candidate_id == CandidateModel.id)
+        .where(CandidateResponse.vacancy_id == body.vacancy_id)
+    )
+    rows = (await db.execute(q)).all()
+    if not rows:
+        return {"answer": "Пока нет откликов по этой вакансии."}
+
+    def fmt(row):
+        resp, cand = row
+        score = resp.relevance_score or 0.0
+        summary = (resp.rejection_reasons or {}).get("summary", {})
+        positives = "; ".join(summary.get("positives") or [])
+        risks = "; ".join(summary.get("risks") or [])
+        return f"- {cand.full_name}: score={int(round(score*100))}% | + {positives or '—'} | риски: {risks or '—'}"
+
+    context_list = "\n".join(fmt(r) for r in rows)
+
+    sys = (
+        "Ты помощник HR. Отвечай кратко и по делу, опираясь только на предоставленные данные."
+        " Если просят сравнить/рекомендовать, поясни на 1–2 предложения почему."
+    )
+    prompt = (
+        f"Вакансия имеет отклики (score и сводка):\n{context_list}\n\n"
+        f"Вопрос работодателя: {body.question}\n"
+        "Дай полезный ответ на русском, учитывая score и риски/сильные стороны."
+    )
+
+    try:
+        llm = get_llm()
+        res = await llm.ainvoke([{"role": "system", "content": sys}, {"role": "user", "content": prompt}])
+        text = res.content if hasattr(res, "content") else str(res)
+        return {"answer": text}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"LLM error: {e}")

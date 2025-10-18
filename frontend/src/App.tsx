@@ -42,7 +42,6 @@ function HeaderNav() {
   const role = getRole()
   return (
     <nav className="space-x-4 text-sm">
-      {!role && <Link to="/auth" className="text-grayx-600 hover:text-grayx-900">Вход</Link>}
       {role === 'candidate' && <Link to="/" className="text-grayx-600 hover:text-grayx-900">Соискателям</Link>}
       {role === 'employer' && <Link to="/employer-admin" className="text-grayx-600 hover:text-grayx-900">Работодателям</Link>}
       {role && <button className="text-grayx-600 hover:text-grayx-900" onClick={() => { logoutAll(); nav('/auth') }}>Выйти</button>}

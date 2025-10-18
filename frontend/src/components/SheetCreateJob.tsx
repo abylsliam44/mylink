@@ -33,7 +33,7 @@ export default function SheetCreateJob({ open, onClose, onCreated }: Props) {
 
   const close = () => { if (!loading) { reset(); onClose() } }
 
-  const submit = async (publish: boolean) => {
+  const submit = async (_publish: boolean) => {
     setError('')
     if (!title.trim() || !location.trim()) {
       setError('Заполните обязательные поля: название, город/формат')

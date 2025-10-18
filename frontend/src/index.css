@@ -18,6 +18,8 @@ html, body, #root {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+@keyframes pulse-soft { 0%{opacity:.6} 50%{opacity:1} 100%{opacity:.6} }
+@keyframes dots { 0%{content:"."} 33%{content:".."} 66%{content:"..."} 100%{content:"."} }
 
 .animate-page {
   animation: fade-in-up .5s ease-out both;
@@ -33,6 +35,14 @@ html, body, #root {
   background-size: 200% 100%;
   animation: shimmer 2.4s ease-in-out infinite;
 }
+.pulse-soft { animation: pulse-soft 1.6s ease-in-out infinite; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+.transition-base { transition: all .2s ease-in-out; }
+
+/* Loading spinner */
+.loader { width:20px;height:20px;border-radius:50%;border:3px solid #E6E8EB;border-top-color:#2E6BFF; animation: spin 1s linear infinite; }
+
 
 /* Soft lift on hover for cards/buttons */
 .hover-lift {
