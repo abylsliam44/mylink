@@ -65,7 +65,7 @@ export default function Auth() {
         <div className="auth-gradient" />
       </div>
 
-      <div className="container py-12 animate-page">
+      <div className="container animate-page min-h-[calc(100vh-64px-40px)] flex items-center py-8">
         <div className="mx-auto bg-white/80 backdrop-blur border border-[#E6E8EB] rounded-2xl shadow-sm overflow-hidden hover-lift" style={{ maxWidth: 960 }}>
           <div className="grid md:grid-cols-2">
             {/* Left: pitch */}
