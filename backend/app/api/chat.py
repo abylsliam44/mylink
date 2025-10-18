@@ -5,7 +5,7 @@ from uuid import UUID
 import json
 from typing import Dict
 
-from app.db.session import get_db
+from app.db.session import get_db, AsyncSessionLocal
 from app.models.response import CandidateResponse, ResponseStatus
 from app.models.chat import SenderType
 from app.services.chat_service import ChatService
