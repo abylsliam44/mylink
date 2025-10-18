@@ -5,6 +5,7 @@ import Donut from '../components/Donut'
 import BreakdownRow from '../components/BreakdownRow'
 import SheetCreateJob from '../components/SheetCreateJob'
 import RiskCarousel from '../components/RiskCarousel'
+import EmployerAssistant from '../components/EmployerAssistant'
 
 export default function EmployerAdmin() {
   // SheetCreateJob manages its own form; keep ref for smooth scroll if needed later
@@ -31,6 +32,7 @@ export default function EmployerAdmin() {
   const [aiData, setAiData] = useState<any | null>(null)
   const [openCreate, setOpenCreate] = useState(false)
   const [aiCache, setAiCache] = useState<Record<string, any>>({})
+  const [openAssistant, setOpenAssistant] = useState(false)
 
   const loadVacancies = async () => {
     setLoadingVacancies(true)
@@ -130,6 +132,22 @@ export default function EmployerAdmin() {
     URL.revokeObjectURL(url)
   }
 
+  // Relative comparison metric (selected candidate vs all responses in vacancy)
+  const selectedScorePct = useMemo(() => {
+    if (!selectedResponse) return 0
+    const aiScore = aiData?.scorer?.overall_match_pct
+    if (typeof aiScore === 'number' && aiScore >= 0) return Math.round(aiScore)
+    const raw = typeof selectedResponse.relevance_score === 'number' ? selectedResponse.relevance_score * 100 : 0
+    return Math.round(raw)
+  }, [selectedResponse, aiData?.scorer?.overall_match_pct])
+
+  const relativePercentile = useMemo(() => {
+    if (!selectedResponse || !responses.length) return null
+    const scores = responses.map(r => (typeof r.relevance_score === 'number' ? Math.round(r.relevance_score * 100) : 0))
+    const betterOrEqual = scores.filter(v => v <= selectedScorePct).length
+    return Math.round((betterOrEqual / scores.length) * 100)
+  }, [responses, selectedResponse, selectedScorePct])
+
   return (
     <div className="container mx-auto max-w-[1200px] px-4 py-6 space-y-6">
       {/* Hero */}
@@ -142,6 +160,7 @@ export default function EmployerAdmin() {
           <div className="flex gap-2">
             <button className="btn-primary" onClick={() => setOpenCreate(true)}>Новая вакансия</button>
             <button className="btn-outline" onClick={exportCsv} disabled={!filtered.length}>Экспорт CSV</button>
+            {activeVacancyId && <button className="btn-outline" onClick={() => setOpenAssistant(true)}>Ассистент</button>}
           </div>
         </div>
       </section>
@@ -250,13 +269,19 @@ export default function EmployerAdmin() {
 
             {/* Right column: AI Analyst */}
             <aside className="lg:col-span-5 order-1 lg:order-none">
-              <div className="sticky top-4 rounded-2xl border border-[#E6E8EB] bg-white shadow-sm p-4 space-y-3">
+              <div className="sticky top-4 rounded-2xl border border-[#E6E8EB] bg-white shadow-sm p-4 space-y-3 relative overflow-hidden">
                 <div className="flex items-center justify-between">
                   <div className="text-[16px] font-semibold">AI Analyst</div>
                 </div>
                 {!selectedResponse && <div className="text-[14px] text-[#666]">Выберите отклик слева. Пока данные ожидаются.</div>}
                 {selectedResponse && (
                   <div className="space-y-3">
+                    {aiLoading && (
+                      <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-10">
+                        <div className="loader" aria-label="Анализируем..." />
+                        <span className="ml-3 text-[14px] text-[#0A0A0A]">Анализируем<span className="ml-1">…</span></span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-3">
                       <Donut value={Math.round(aiData?.scorer?.overall_match_pct ?? (typeof selectedResponse.relevance_score === 'number' ? selectedResponse.relevance_score * 100 : 0))} colorByThresholds={[{max:60,color:'#DC2626'},{min:60,max:75,color:'#F59E0B'},{min:75,color:'#16A34A'}]} />
                       <div className="min-w-0">
@@ -272,6 +297,7 @@ export default function EmployerAdmin() {
                       <BreakdownRow label="Компенсация" pct={aiData?.scorer?.scores_pct?.comp ?? 0} />
                       <BreakdownRow label="Образование" pct={aiData?.scorer?.scores_pct?.education ?? 0} />
                       <BreakdownRow label="Домен" pct={aiData?.scorer?.scores_pct?.domain ?? 0} />
+                      {relativePercentile !== null && <BreakdownRow label="Сравнение среди откликов (перцентиль)" pct={relativePercentile} />}
                     </div>
                     <div className="space-y-2">
                       {aiData?.scorer?.summary?.positives?.length > 0 ? (
@@ -290,8 +316,8 @@ export default function EmployerAdmin() {
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                      <button className="btn-primary col-span-2" onClick={runPipelineForSelected} disabled={aiLoading}>Отправить приглашение</button>
-                      <button className="btn-outline" onClick={runPipelineForSelected} disabled={aiLoading}>Уточнить</button>
+                      <button className="btn-primary col-span-2 transition-base" onClick={runPipelineForSelected} disabled={aiLoading}>Отправить приглашение</button>
+                      <button className="btn-outline transition-base" onClick={runPipelineForSelected} disabled={aiLoading}>Уточнить</button>
                     </div>
                     {aiError && <div className="text-[12px] text-[#DC2626]" role="alert" aria-live="polite">{aiError}</div>}
                     <div className="text-[12px] text-[#666]">Обновлено {aiData ? 'только что' : '—'}</div>
@@ -311,6 +337,9 @@ export default function EmployerAdmin() {
           )}
           {/* Table view replaced by vertical cards above */}
         </section>
+      )}
+      {openAssistant && activeVacancyId && (
+        <EmployerAssistant vacancyId={activeVacancyId} onClose={() => setOpenAssistant(false)} />
       )}
     </div>
   )

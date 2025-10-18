@@ -43,6 +43,7 @@ export default function Catalog() {
   // Search UI
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState<'new' | 'top' | 'almaty'>('new')
+  const [showResumeEditor, setShowResumeEditor] = useState(false)
 
   // Load vacancies
   useEffect(() => {
@@ -131,18 +132,23 @@ export default function Catalog() {
 
   return (
     <div>
-      {/* Hero */}
-      <section className="hero">
-        <div className="container text-center">
-          <h1 className="text-[44px] leading-[52px] font-semibold tracking-[-0.01em]">Найдите идеальную вакансию</h1>
-          <div className="searchbar" role="search" aria-label="Поиск вакансий">
-            <input aria-label="Введите название профессии" placeholder="Введите название профессии" value={query} onChange={e => setQuery(e.target.value)} />
-            <button aria-label="Найти">НАЙТИ</button>
-          </div>
-          <div className="tabs" role="tablist" aria-label="Фильтры">
-            <button className={`tab ${tab === 'new' ? 'active' : ''}`} role="tab" aria-selected={tab === 'new'} onClick={() => setTab('new')}>Новые вакансии</button>
-            <button className={`tab ${tab === 'top' ? 'active' : ''}`} role="tab" aria-selected={tab === 'top'} onClick={() => setTab('top')}>Топ зарплаты</button>
-            <button className={`tab ${tab === 'almaty' ? 'active' : ''}`} role="tab" aria-selected={tab === 'almaty'} onClick={() => setTab('almaty')}>Работа в Алматы</button>
+      {/* Filters */}
+      {/* Filter bar (static, not sticky) */}
+      <section className="bg-white border-b border-[#E6E8EB]">
+        <div className="container py-4">
+          <div className="w-full flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 border border-[#E6E8EB] rounded-xl px-3 py-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.3-4.3" stroke="#98A2B3" strokeWidth="2" strokeLinecap="round"/><circle cx="11" cy="11" r="7" stroke="#98A2B3" strokeWidth="2"/></svg>
+                <input className="flex-1 outline-none" aria-label="Поиск" placeholder="Поиск по вакансии, навыкам, городу" value={query} onChange={e => setQuery(e.target.value)} />
+                <button className="btn-primary">Найти</button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className={`tab ${tab === 'new' ? 'active' : ''}`} onClick={() => setTab('new')}>Новые вакансии</button>
+              <button className={`tab ${tab === 'top' ? 'active' : ''}`} onClick={() => setTab('top')}>Топ зарплаты</button>
+              <button className={`tab ${tab === 'almaty' ? 'active' : ''}`} onClick={() => setTab('almaty')}>Работа в Алматы</button>
+            </div>
           </div>
         </div>
       </section>
@@ -177,20 +183,35 @@ export default function Catalog() {
 
           {/* Right: resume + apply */}
           <div className="space-y-4 sticky" style={{ top: 16 }}>
-            {/* My Resume */}
+            {/* My Resume (collapsed by default) */}
             <div className="card p-4">
-              <h3 className="text-[16px] font-semibold text-grayx-900 mb-2">Моё резюме</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <input className="border rounded px-3 py-2" placeholder="ФИО" value={fullName} onChange={e => setFullName(e.target.value)} />
-                <input className="border rounded px-3 py-2" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
-                <input className="border rounded px-3 py-2" placeholder="Город" value={city} onChange={e => setCity(e.target.value)} />
-                <input className="border rounded px-3 py-2" type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[16px] font-semibold text-grayx-900">Моё резюме</h3>
+                {!showResumeEditor && !candidateId && (
+                  <button className="btn-outline" onClick={() => setShowResumeEditor(true)}>Заполнить</button>
+                )}
               </div>
-              <div className="mt-3 flex gap-2">
-                <button className="btn-primary" onClick={uploadResume} disabled={busy}>Загрузить PDF</button>
-                <button className="btn-outline" onClick={() => { setPdfFile(null); setResumeSnippet(''); setCandidateId(null); try { localStorage.removeItem('candidate_id'); localStorage.removeItem('candidate_resume_snippet') } catch {} }}>Очистить</button>
-              </div>
-              {candidateId && <div className="text-xs text-grayx-600 mt-2">ID: {candidateId}</div>}
+              {!candidateId && !showResumeEditor && (
+                <div className="text-[12px] text-[#666]">Добавьте резюме позже или загрузите PDF — форма спрятана, чтобы не мешать.</div>
+              )}
+              {(!candidateId && showResumeEditor) && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <input className="border rounded px-3 py-2" placeholder="ФИО" value={fullName} onChange={e => setFullName(e.target.value)} />
+                    <input className="border rounded px-3 py-2" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
+                    <input className="border rounded px-3 py-2" placeholder="Город" value={city} onChange={e => setCity(e.target.value)} />
+                    <input className="border rounded px-3 py-2" type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
+                  </div>
+                  <div className="mt-1 flex gap-2">
+                    <button className="btn-primary" onClick={uploadResume} disabled={busy}>Загрузить PDF</button>
+                    <button className="btn-outline" onClick={() => { setPdfFile(null); setResumeSnippet(''); setCandidateId(null); try { localStorage.removeItem('candidate_id'); localStorage.removeItem('candidate_resume_snippet') } catch {} }}>Очистить</button>
+                    <button className="btn-outline" onClick={() => setShowResumeEditor(false)}>Скрыть</button>
+                  </div>
+                </div>
+              )}
+              {candidateId && (
+                <div className="text-[12px] text-grayx-600">Резюме загружено. ID: {candidateId}</div>
+              )}
               {resumeSnippet && (
                 <div className="mt-3 text-[12px] text-grayx-600 max-h-40 overflow-auto border rounded p-2 bg-grayx-50">{resumeSnippet}</div>
               )}
