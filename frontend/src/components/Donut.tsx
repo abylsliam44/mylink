@@ -1,4 +1,4 @@
-import React from 'react'
+// no explicit React import needed with automatic runtime
 
 type Threshold = { min?: number; max?: number; color: string }
 
