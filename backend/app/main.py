@@ -5,7 +5,9 @@ import logging
 
 from app.config import settings
 from app.api import auth, employers, vacancies, candidates, responses, chat
+from app.api import ai as ai_router
 from app.db.redis import close_redis
+from app.services.ai.registry_setup import register_all_agents
 
 # Configure logging
 logging.basicConfig(
@@ -23,6 +25,9 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting SmartBot Backend...")
     logger.info(f"Debug mode: {settings.DEBUG}")
+    # Register AI agents
+    register_all_agents()
+    logger.info("AI agents registered")
     
     yield
     
@@ -56,6 +61,7 @@ app.include_router(vacancies.router)
 app.include_router(candidates.router)
 app.include_router(responses.router)
 app.include_router(chat.router)
+app.include_router(ai_router.router)
 
 
 @app.get("/")

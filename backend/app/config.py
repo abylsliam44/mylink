@@ -18,6 +18,15 @@ class Settings(BaseSettings):
     # App
     DEBUG: bool = True
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+
+    # AI / OpenAI
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MODEL: str = "gpt-4.1"
+
+    # AI policy
+    AI_APPROVAL_THRESHOLD: int = 70
+    AI_MAX_QUESTIONS: int = 3
+    AI_TONE: str = "neutral"
     
     @property
     def allowed_origins_list(self) -> List[str]:
