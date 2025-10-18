@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from uuid import UUID
+import json
 
 from app.db.session import get_db
 from app.schemas.candidate import CandidateCreate, CandidateResponse
@@ -16,12 +17,23 @@ from pypdf import PdfReader
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
 
+def _load_profile(candidate: Candidate) -> Dict[str, Any]:
+  try:
+    data = json.loads(candidate.resume_text or '{}')
+    return data if isinstance(data, dict) else {}
+  except Exception:
+    return {}
+
+
+def _save_profile(profile: Dict[str, Any]) -> str:
+  return json.dumps(profile, ensure_ascii=False)[:20000]
+
+
 @router.post("", response_model=CandidateResponse, status_code=status.HTTP_201_CREATED)
 async def create_candidate(
     candidate_data: CandidateCreate,
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a new candidate profile"""
     new_candidate = Candidate(
         full_name=candidate_data.full_name,
         email=candidate_data.email,
@@ -45,7 +57,6 @@ async def upload_candidate_pdf(
     vacancy_id: Optional[UUID] = Form(None),
     db: AsyncSession = Depends(get_db),
 ):
-    """Upload PDF resume, extract text, create candidate, and optional response."""
     if file.content_type not in {"application/pdf"}:
         raise HTTPException(status_code=400, detail="Поддерживается только PDF")
     content = await file.read()
@@ -62,7 +73,6 @@ async def upload_candidate_pdf(
     await db.refresh(cand)
 
     if vacancy_id:
-        # ensure vacancy exists
         v = await db.execute(select(Vacancy).where(Vacancy.id == vacancy_id))
         if v.scalar_one_or_none():
             r = RespModel(vacancy_id=vacancy_id, candidate_id=cand.id, status=ResponseStatus.NEW)
@@ -76,7 +86,6 @@ async def get_candidate(
     candidate_id: UUID,
     db: AsyncSession = Depends(get_db)
 ):
-    """Get candidate by ID"""
     result = await db.execute(
         select(Candidate).where(Candidate.id == candidate_id)
     )
@@ -90,11 +99,30 @@ async def get_candidate(
     return candidate
 
 
+@router.get("/{candidate_id}/profile")
+async def get_candidate_profile(candidate_id: UUID, db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
+    result = await db.execute(select(Candidate).where(Candidate.id == candidate_id))
+    candidate = result.scalar_one_or_none()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    return _load_profile(candidate)
+
+
+@router.put("/{candidate_id}/profile")
+async def update_candidate_profile(candidate_id: UUID, profile: Dict[str, Any], db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
+    result = await db.execute(select(Candidate).where(Candidate.id == candidate_id))
+    candidate = result.scalar_one_or_none()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    candidate.resume_text = _save_profile(profile)
+    await db.flush()
+    return _load_profile(candidate)
+
+
 @router.get("", response_model=List[CandidateResponse])
 async def list_candidates(
     db: AsyncSession = Depends(get_db)
 ):
-    """List all candidates"""
     result = await db.execute(
         select(Candidate).order_by(Candidate.created_at.desc())
     )

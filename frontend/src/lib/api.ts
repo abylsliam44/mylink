@@ -36,3 +36,46 @@ export function wsUrl(path: string): string {
   const p = path.startsWith('/') ? path : `/${path}`
   return `${url.origin}${p}`
 }
+
+// Role persistence
+const ROLE_KEY = 'auth_role'
+export type UserRole = 'employer' | 'candidate'
+const CANDIDATE_ID_KEY = 'candidate_id'
+
+export function getRole(): UserRole | null {
+  try {
+    const v = localStorage.getItem(ROLE_KEY)
+    return v === 'employer' || v === 'candidate' ? v : null
+  } catch {
+    return null
+  }
+}
+
+export function setRole(role: UserRole | null) {
+  try {
+    if (role) localStorage.setItem(ROLE_KEY, role)
+    else localStorage.removeItem(ROLE_KEY)
+  } catch {}
+}
+
+export function logoutAll() {
+  try {
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem(ROLE_KEY)
+    localStorage.removeItem(CANDIDATE_ID_KEY)
+  } catch {}
+  setAuthToken(null)
+}
+
+export function setCandidateId(id: string | null) {
+  try {
+    if (id) localStorage.setItem(CANDIDATE_ID_KEY, id)
+    else localStorage.removeItem(CANDIDATE_ID_KEY)
+  } catch {}
+}
+
+export function getCandidateId(): string | null {
+  try {
+    return localStorage.getItem(CANDIDATE_ID_KEY)
+  } catch { return null }
+}

@@ -1,8 +1,10 @@
-import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import EmployerAdmin from './pages/EmployerAdmin'
 import CandidateWidget from './pages/CandidateWidget'
 import Catalog from './pages/Catalog'
 import Auth from './pages/Auth'
+import { getRole, logoutAll } from './lib/api'
+import ResumeEditor from './pages/ResumeEditor'
 
 function App() {
   return (
@@ -14,17 +16,14 @@ function App() {
               <span className="text-[#111827]">my</span>
               <span className="text-primary-600">link</span>
             </Link>
-            <nav className="space-x-4 text-sm">
-              <Link to="/" className="text-grayx-600 hover:text-grayx-900">Соискателям</Link>
-              <Link to="/employer-admin" className="text-grayx-600 hover:text-grayx-900">Работодателям</Link>
-              <Link to="/auth" className="text-grayx-600 hover:text-grayx-900">Вход</Link>
-            </nav>
+            <HeaderNav />
           </div>
         </header>
         <main className="flex-1">
           <Routes>
-            <Route path="/" element={<Catalog />} />
-            <Route path="/employer-admin" element={<EmployerAdmin />} />
+            <Route path="/" element={<AuthGate />} />
+            <Route path="/resume" element={<ResumeEditor />} />
+            <Route path="/employer-admin" element={<RequireRole role="employer"><EmployerAdmin /></RequireRole>} />
             <Route path="/widget" element={<CandidateWidget />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -37,3 +36,29 @@ function App() {
 }
 
 export default App
+
+function HeaderNav() {
+  const nav = useNavigate()
+  const role = getRole()
+  return (
+    <nav className="space-x-4 text-sm">
+      {!role && <Link to="/auth" className="text-grayx-600 hover:text-grayx-900">Вход</Link>}
+      {role === 'candidate' && <Link to="/" className="text-grayx-600 hover:text-grayx-900">Соискателям</Link>}
+      {role === 'employer' && <Link to="/employer-admin" className="text-grayx-600 hover:text-grayx-900">Работодателям</Link>}
+      {role && <button className="text-grayx-600 hover:text-grayx-900" onClick={() => { logoutAll(); nav('/auth') }}>Выйти</button>}
+    </nav>
+  )
+}
+
+function RequireRole({ role, children }: { role: 'employer' | 'candidate'; children: React.ReactElement }) {
+  const current = getRole()
+  if (current !== role) return <Navigate to="/auth" replace />
+  return children
+}
+
+function AuthGate() {
+  const role = getRole()
+  const location = useLocation()
+  if (!role) return <Navigate to="/auth" replace state={{ from: location }} />
+  return role === 'employer' ? <Navigate to="/employer-admin" replace /> : <Catalog />
+}
