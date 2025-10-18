@@ -1,19 +1,21 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from uuid import UUID
 import json
 from typing import Dict, List
 
 from app.db.session import get_db
 from app.models.response import CandidateResponse, ResponseStatus
-from app.models.chat import SenderType, ChatMessage
+from app.models.chat import SenderType, ChatMessage, ChatSession
 from app.services.chat_service import ChatService
 from app.services.interview_service import interview_service
 
 router = APIRouter(tags=["Chat"])
 
-# Store active WebSocket connections
+# Store active WebSocket connections (one per response_id)
+# Format: {response_id: websocket}
 active_connections: Dict[str, WebSocket] = {}
 
 
@@ -27,8 +29,21 @@ async def chat_websocket(
     """
     await websocket.accept()
 
-    # Store connection
+    # Store connection and disconnect any previous connection (single-session enforcement)
     connection_key = str(response_id)
+    
+    # If there's already an active connection, disconnect it
+    if connection_key in active_connections:
+        old_ws = active_connections[connection_key]
+        try:
+            await old_ws.send_json({
+                "type": "disconnected",
+                "message": "Новое подключение обнаружено. Чат открыт на другом устройстве."
+            })
+            await old_ws.close()
+        except:
+            pass  # Old connection might already be closed
+    
     active_connections[connection_key] = websocket
 
     interview_questions: List[Dict] = []
@@ -37,9 +52,11 @@ async def chat_websocket(
     try:
         # Get database session
         async for db in get_db():
-            # Verify response exists
+            # Verify response exists and eagerly load chat_session
             result = await db.execute(
-                select(CandidateResponse).where(CandidateResponse.id == response_id)
+                select(CandidateResponse)
+                .options(selectinload(CandidateResponse.chat_session))
+                .where(CandidateResponse.id == response_id)
             )
             response = result.scalar_one_or_none()
 
@@ -90,7 +107,8 @@ async def chat_websocket(
                         "message": "Интервью уже завершено",
                         "completed": True
                     })
-                    return
+                    await db.commit()
+                    break  # Exit the async for loop instead of return
             else:
                 # Start new interview
                 # Update response status to in_chat
@@ -135,18 +153,38 @@ async def chat_websocket(
                         "progress": f"Вопрос {current_question_index + 1} из {len(interview_questions)}"
                     })
                 else:
-                    # No questions generated
+                    # No questions generated - end interview
                     await websocket.send_json({
                         "type": "chat_ended",
-                        "message": interview_result.get("closing_message", "Интервью завершено"),
+                        "message": interview_result.get("closing_message", "Интервью завершено. Все данные уже заполнены."),
                         "completed": True
                     })
-                    return
+                    await db.commit()
+                    break  # Exit the async for loop instead of return
 
             # Listen for candidate messages
             while True:
                 data = await websocket.receive_text()
                 message_data = json.loads(data)
+
+                # Handle different message types
+                msg_type = message_data.get("type", "message")
+                
+                # Handle cancel/exit
+                if msg_type == "cancel" or msg_type == "exit":
+                    await websocket.send_json({
+                        "type": "chat_cancelled",
+                        "message": "Собеседование отменено. Вы можете вернуться позже."
+                    })
+                    break
+                
+                # Handle pause (just acknowledge, resume will reconnect)
+                if msg_type == "pause":
+                    await websocket.send_json({
+                        "type": "chat_paused",
+                        "message": "Собеседование приостановлено. Вы можете продолжить в любое время."
+                    })
+                    break
 
                 candidate_message = message_data.get("message", "")
 

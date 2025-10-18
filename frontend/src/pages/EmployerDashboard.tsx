@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api'
+import InterviewSummary from '../components/InterviewSummary'
+import ChatHistory from '../components/ChatHistory'
 
 export default function EmployerDashboard() {
   const [token, setToken] = useState<string | null>(null)
@@ -21,6 +23,8 @@ export default function EmployerDashboard() {
 
   // Responses
   const [responses, setResponses] = useState<any[]>([])
+  const [selectedResponseId, setSelectedResponseId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'summary' | 'chat'>('summary')
 
   // AI Mismatch quick test
   const [jobText, setJobText] = useState('Python backend developer, FastAPI, PostgreSQL, Docker, office in Almaty, EN B2')
@@ -178,15 +182,93 @@ export default function EmployerDashboard() {
         </div>
         <div className="mt-3 divide-y">
           {responses.map((r) => (
-            <div key={r.id} className="py-3">
+            <div key={r.id} className="py-3 hover:bg-gray-50 transition rounded px-2">
               <div className="font-medium">{r.candidate_name} — {r.candidate_email} — {r.candidate_city}</div>
-              <div className="text-sm text-gray-600">status: {r.status} | score: {r.relevance_score ?? 'n/a'}</div>
+              <div className="text-sm text-gray-600 mb-2">
+                status: <span className={`font-semibold ${
+                  r.status === 'approved' ? 'text-green-600' :
+                  r.status === 'rejected' ? 'text-red-600' :
+                  r.status === 'in_chat' ? 'text-blue-600' :
+                  'text-gray-600'
+                }`}>{r.status}</span> | score: {r.relevance_score ? `${Math.round(r.relevance_score * 100)}%` : 'n/a'}
+              </div>
               {r.rejection_reasons && <pre className="text-xs mt-1 bg-gray-50 p-2 rounded border">{JSON.stringify(r.rejection_reasons, null, 2)}</pre>}
+              
+              <div className="flex gap-2 mt-3">
+                <button
+                  className="text-sm px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded flex items-center gap-2 transition"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setViewMode('summary')
+                    setSelectedResponseId(r.id)
+                  }}
+                >
+                  📊 Просмотреть сводку
+                </button>
+                
+                {(r.status === 'in_chat' || r.status === 'approved' || r.status === 'rejected') && (
+                  <button
+                    className="text-sm px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 rounded flex items-center gap-2 transition"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setViewMode('chat')
+                      setSelectedResponseId(r.id)
+                    }}
+                  >
+                    💬 История чата
+                  </button>
+                )}
+              </div>
             </div>
           ))}
           {responses.length === 0 && <div className="text-sm text-gray-500">No responses yet</div>}
         </div>
       </section>
+
+      {/* Summary/Chat Modal */}
+      {selectedResponseId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-auto">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-auto relative">
+            <div className="sticky top-0 z-10 bg-white border-b flex items-center justify-between p-4">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setViewMode('summary')}
+                  className={`px-4 py-2 rounded ${
+                    viewMode === 'summary' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  📊 Сводка
+                </button>
+                <button
+                  onClick={() => setViewMode('chat')}
+                  className={`px-4 py-2 rounded ${
+                    viewMode === 'chat' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  💬 История чата
+                </button>
+              </div>
+              <button
+                onClick={() => setSelectedResponseId(null)}
+                className="text-gray-400 hover:text-gray-600 text-2xl bg-white rounded-full w-8 h-8 flex items-center justify-center"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-4">
+              {viewMode === 'summary' ? (
+                <InterviewSummary responseId={selectedResponseId} />
+              ) : (
+                <ChatHistory responseId={selectedResponseId} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="bg-white rounded-lg shadow p-4 space-y-3">
         <h2 className="text-lg font-semibold">AI: End-to-End Screening</h2>

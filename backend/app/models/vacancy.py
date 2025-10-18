@@ -18,6 +18,7 @@ class Vacancy(Base):
     location = Column(String, nullable=False)
     salary_min = Column(Integer, nullable=True)
     salary_max = Column(Integer, nullable=True)
+    max_questions = Column(Integer, default=3, nullable=False, comment="Maximum interview questions (3-8)")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
     # Relationships

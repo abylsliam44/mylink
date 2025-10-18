@@ -10,7 +10,10 @@ from app.models.response import CandidateResponse, ResponseStatus
 from app.models.vacancy import Vacancy
 from app.models.candidate import Candidate
 from app.models.employer import Employer
+from app.models.chat import ChatSession, ChatMessage
 from app.utils.auth import get_current_employer
+from app.schemas.chat import ChatSessionResponse, ChatMessageResponse
+from app.services.interview_service import interview_service
 
 router = APIRouter(prefix="/responses", tags=["Responses"])
 
@@ -135,4 +138,88 @@ async def list_responses(
         response_list.append(item)
     
     return response_list
+
+
+@router.get("/{response_id}/chat", response_model=ChatSessionResponse)
+async def get_response_chat_history(
+    response_id: UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get complete chat history for a response"""
+    # Get response
+    response_result = await db.execute(
+        select(CandidateResponse).where(CandidateResponse.id == response_id)
+    )
+    response = response_result.scalar_one_or_none()
+    
+    if not response:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Response not found"
+        )
+    
+    # Get chat session
+    if not response.chat_session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No chat session found for this response"
+        )
+    
+    # Get all messages
+    messages_result = await db.execute(
+        select(ChatMessage)
+        .where(ChatMessage.session_id == response.chat_session.id)
+        .order_by(ChatMessage.created_at)
+    )
+    messages = messages_result.scalars().all()
+    
+    # Build response
+    chat_data = ChatSessionResponse(
+        id=response.chat_session.id,
+        response_id=response.chat_session.response_id,
+        started_at=response.chat_session.started_at,
+        ended_at=response.chat_session.ended_at,
+        messages=[
+            ChatMessageResponse(
+                id=msg.id,
+                session_id=msg.session_id,
+                sender_type=msg.sender_type,
+                message_text=msg.message_text,
+                created_at=msg.created_at
+            )
+            for msg in messages
+        ]
+    )
+    
+    return chat_data
+
+
+@router.get("/{response_id}/summary")
+async def get_response_summary(
+    response_id: UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get comprehensive structured summary for employer review"""
+    # Verify response exists
+    response_result = await db.execute(
+        select(CandidateResponse).where(CandidateResponse.id == response_id)
+    )
+    response = response_result.scalar_one_or_none()
+    
+    if not response:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Response not found"
+        )
+    
+    # Generate or retrieve summary
+    try:
+        summary = await interview_service.generate_summary(response_id, db)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate summary: {str(e)}"
+        )
+    
+    return summary
 

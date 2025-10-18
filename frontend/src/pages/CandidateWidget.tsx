@@ -89,7 +89,9 @@ function ChatModal({
   input,
   setInput,
   onSendMessage,
-  onKeyPress
+  onKeyPress,
+  onPause,
+  onCancel
 }: {
   isOpen: boolean
   onClose: () => void
@@ -99,6 +101,8 @@ function ChatModal({
   setInput: (value: string) => void
   onSendMessage: () => void
   onKeyPress: (e: React.KeyboardEvent) => void
+  onPause: () => void
+  onCancel: () => void
 }) {
   if (!isOpen) return null
 
@@ -120,9 +124,14 @@ function ChatModal({
         {!chatState.isCompleted && chatState.totalQuestions > 0 && (
           <div className="bg-gray-50 p-4 space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">
-                Прогресс: {chatState.questionIndex + 1} / {chatState.totalQuestions}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="font-medium">
+                  Прогресс: {chatState.questionIndex + 1} / {chatState.totalQuestions}
+                </span>
+                <span className="text-gray-600">
+                  ≈ {chatState.estimatedTimeMinutes} мин
+                </span>
+              </div>
               {chatState.currentScore > 0 && (
                 <span className={`font-medium px-2 py-1 rounded text-xs ${
                   chatState.currentScore >= 70 ? 'bg-green-100 text-green-800' :
@@ -139,6 +148,23 @@ function ChatModal({
                 style={{ width: `${(chatState.questionIndex / chatState.totalQuestions) * 100}%` }}
               ></div>
             </div>
+            {/* Action buttons */}
+            {!chatState.isPaused && (
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={onPause}
+                  className="text-sm px-3 py-1 text-gray-600 hover:text-gray-800"
+                >
+                  ⏸ Приостановить
+                </button>
+                <button
+                  onClick={onCancel}
+                  className="text-sm px-3 py-1 text-red-600 hover:text-red-800"
+                >
+                  ✕ Отменить
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -232,8 +258,10 @@ export default function CandidateWidget() {
     totalQuestions: 0,
     currentScore: 0,
     isCompleted: false,
+    isPaused: false,
     verdict: '',
-    finalScore: 0
+    finalScore: 0,
+    estimatedTimeMinutes: 2
   })
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectAttempts = useRef(0)
@@ -294,9 +322,24 @@ export default function CandidateWidget() {
       totalQuestions: 0,
       currentScore: 0,
       isCompleted: false,
+      isPaused: false,
       verdict: '',
-      finalScore: 0
+      finalScore: 0,
+      estimatedTimeMinutes: 2
     })
+  }
+
+  const handlePauseChat = () => {
+    const ws = wsRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
+    ws.send(JSON.stringify({ type: 'pause' }))
+    setChatState(prev => ({ ...prev, isPaused: true }))
+  }
+
+  const handleCancelChat = () => {
+    const ws = wsRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
+    ws.send(JSON.stringify({ type: 'cancel' }))
   }
 
   const connectWs = () => {
@@ -318,12 +361,17 @@ export default function CandidateWidget() {
         if (data.type === 'bot_message' && data.message) {
           setMessages(prev => [...prev, { sender: 'bot', text: data.message }])
 
+          // Calculate estimated time (30 seconds per question)
+          const remaining = (data.total_questions || 0) - (data.question_index || 0) - 1
+          const estimatedMinutes = Math.max(1, Math.ceil((remaining * 30) / 60))
+
           // Update chat state
           setChatState(prev => ({
             ...prev,
             questionIndex: data.question_index || prev.questionIndex,
             totalQuestions: data.total_questions || prev.totalQuestions,
             currentScore: data.current_score || prev.currentScore,
+            estimatedTimeMinutes: estimatedMinutes,
             isCompleted: false
           }))
         } else if (data.type === 'chat_ended') {
@@ -338,6 +386,14 @@ export default function CandidateWidget() {
             verdict: data.verdict || prev.verdict,
             finalScore: data.final_score || prev.finalScore
           }))
+        } else if (data.type === 'chat_paused') {
+          setMessages(prev => [...prev, { sender: 'bot', text: data.message || 'Собеседование приостановлено' }])
+          setChatState(prev => ({ ...prev, isPaused: true }))
+        } else if (data.type === 'chat_cancelled') {
+          setMessages(prev => [...prev, { sender: 'bot', text: data.message || 'Собеседование отменено' }])
+          setChatState(prev => ({ ...prev, isCompleted: true }))
+        } else if (data.type === 'disconnected') {
+          setMessages(prev => [...prev, { sender: 'bot', text: data.message || 'Соединение разорвано' }])
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error)
@@ -371,9 +427,10 @@ export default function CandidateWidget() {
   }, [])
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 space-y-6">
-      <section className="bg-white rounded-lg shadow p-4 space-y-3">
-        <h2 className="text-lg font-semibold">Candidate</h2>
+    <>
+      <div className="mx-auto max-w-3xl px-4 py-6 space-y-6">
+        <section className="bg-white rounded-lg shadow p-4 space-y-3">
+          <h2 className="text-lg font-semibold">Candidate</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <input className={inputCls} placeholder="Full name" value={fullName} onChange={e => setFullName(e.target.value)} />
           <input className={inputCls} placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
@@ -394,16 +451,25 @@ export default function CandidateWidget() {
         </div>
         <div className="space-x-2">
           <button className={btnCls} onClick={createResponse} disabled={!candidateId || !vacancyId}>Create Response</button>
-          <button
-            className={btnCls}
-            onClick={() => setShowPreChat(true)}
-            disabled={!responseId}
-          >
-            Пройти мини-собеседование (~2 мин)
-          </button>
           {responseId && <span className="text-sm text-gray-600">Response ID: {responseId}</span>}
         </div>
       </section>
+      
+      {/* Floating Chat Button for Candidate */}
+      {responseId && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <button
+            onClick={() => setShowPreChat(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-2xl flex items-center gap-3 transition-all hover:scale-105 animate-bounce"
+            style={{ animationDuration: '2s' }}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+            <span className="font-medium">Пройти мини-собеседование (~2 мин)</span>
+          </button>
+        </div>
+      )}
 
       {/* Chat Modal */}
       <ChatModal
@@ -415,14 +481,17 @@ export default function CandidateWidget() {
         setInput={setInput}
         onSendMessage={sendMsg}
         onKeyPress={(e) => e.key === 'Enter' ? sendMsg() : undefined}
+        onPause={handlePauseChat}
+        onCancel={handleCancelChat}
       />
 
-      {/* Pre-chat Screen */}
-      <PreChatScreen
-        isOpen={showPreChat}
-        onStart={handlePreChatStart}
-        onCancel={handlePreChatCancel}
-      />
-    </div>
+        {/* Pre-chat Screen */}
+        <PreChatScreen
+          isOpen={showPreChat}
+          onStart={handlePreChatStart}
+          onCancel={handlePreChatCancel}
+        />
+      </div>
+    </>
   )
 }

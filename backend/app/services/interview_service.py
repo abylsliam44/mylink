@@ -20,6 +20,7 @@ from app.models.candidate import Candidate
 from app.services.ai.agents.mismatch_agent import MismatchDetectorAgent
 from app.services.ai.agents.question_generator_agent import QuestionGeneratorAgent
 from app.services.ai.agents.relevance_scorer_agent import RelevanceScorerAgent
+from app.services.ai.agents.summary_generator_agent import SummaryGeneratorAgent
 
 
 class InterviewService:
@@ -29,6 +30,7 @@ class InterviewService:
         self.mismatch_agent = MismatchDetectorAgent()
         self.question_agent = QuestionGeneratorAgent()
         self.scorer_agent = RelevanceScorerAgent()
+        self.summary_agent = SummaryGeneratorAgent()
     
     async def start_interview(
         self, 
@@ -309,14 +311,136 @@ class InterviewService:
         )
         response = result.scalar_one_or_none()
         
+        # Generate comprehensive summary for employer
+        summary_result = await self.generate_summary(response_id, db)
+        
         return {
             "response_id": str(response_id),
             "final_score": relevance_result["relevance_score"],
             "verdict": relevance_result["verdict"],
             "status": response.status.value,
             "total_answers": len(response.dialog_findings.get("answers", [])) if response.dialog_findings else 0,
-            "summary": relevance_result.get("summary", {}),
+            "summary": summary_result,
             "interview_completed": True
+        }
+    
+    async def generate_summary(
+        self,
+        response_id: UUID,
+        db: AsyncSession
+    ) -> Dict[str, Any]:
+        """
+        Generate comprehensive structured summary for employer
+        
+        Args:
+            response_id: CandidateResponse ID
+            db: Database session
+            
+        Returns:
+            Dict with structured summary
+        """
+        # Fetch response with all related data
+        result = await db.execute(
+            select(CandidateResponse)
+            .where(CandidateResponse.id == response_id)
+        )
+        response = result.scalar_one_or_none()
+        
+        if not response:
+            raise ValueError(f"CandidateResponse {response_id} not found")
+        
+        # Fetch vacancy
+        vacancy_result = await db.execute(
+            select(Vacancy).where(Vacancy.id == response.vacancy_id)
+        )
+        vacancy = vacancy_result.scalar_one_or_none()
+        
+        # Fetch candidate
+        candidate_result = await db.execute(
+            select(Candidate).where(Candidate.id == response.candidate_id)
+        )
+        candidate = candidate_result.scalar_one_or_none()
+        
+        if not vacancy or not candidate:
+            raise ValueError("Vacancy or Candidate not found")
+        
+        # Build payload for summary generator
+        summary_payload = {
+            "response_id": str(response_id),
+            "vacancy": {
+                "title": vacancy.title,
+                "location": vacancy.location,
+                "salary_min": vacancy.salary_min,
+                "salary_max": vacancy.salary_max,
+                "requirements": vacancy.requirements or {}
+            },
+            "candidate": {
+                "name": candidate.full_name,
+                "city": candidate.city,
+                "resume": candidate.resume_text or ""
+            },
+            "mismatch_analysis": response.mismatch_analysis or {},
+            "dialog_findings": response.dialog_findings or {},
+            "relevance_score": response.relevance_score or 0,
+            "chat_session_id": str(response.chat_session.id) if response.chat_session else None
+        }
+        
+        # Generate summary using AI agent
+        try:
+            summary = self.summary_agent.run(summary_payload)
+        except Exception as e:
+            # Fallback to basic summary if AI fails
+            summary = self._generate_basic_summary(response, vacancy, candidate)
+        
+        return summary
+    
+    def _generate_basic_summary(
+        self,
+        response: CandidateResponse,
+        vacancy: Vacancy,
+        candidate: Candidate
+    ) -> Dict[str, Any]:
+        """Generate a basic summary without AI if agent fails"""
+        return {
+            "overall_match_pct": int((response.relevance_score or 0) * 100),
+            "verdict": "неизвестно",
+            "must_have_coverage": {
+                "covered": [],
+                "missing": [],
+                "partially_covered": []
+            },
+            "experience_breakdown": {
+                "total_years": 0,
+                "key_skills": []
+            },
+            "salary_info": {
+                "expectation_min": None,
+                "expectation_max": None,
+                "vacancy_range_min": vacancy.salary_min,
+                "vacancy_range_max": vacancy.salary_max,
+                "currency": "KZT",
+                "match": "неизвестно"
+            },
+            "location_format": {
+                "candidate_city": candidate.city,
+                "vacancy_city": vacancy.location,
+                "employment_type": "unknown",
+                "relocation_ready": False,
+                "match": candidate.city.lower() == vacancy.location.lower()
+            },
+            "availability": {
+                "ready_in_weeks": None,
+                "notes": ""
+            },
+            "language_proficiency": {},
+            "portfolio_links": [],
+            "risks": [],
+            "summary": {
+                "one_liner": f"Кандидат: {candidate.full_name}",
+                "strengths": [],
+                "concerns": []
+            },
+            "transcript_id": str(response.chat_session.id) if response.chat_session else None
         }
     
     # Helper methods for building payloads
@@ -336,14 +460,32 @@ class InterviewService:
         language: str
     ) -> Dict[str, Any]:
         """Build payload for question generator agent"""
+        # Get max_questions from vacancy (default to 3)
+        max_questions = getattr(vacancy, 'max_questions', 3)
+        
+        # Calculate dynamic question limit based on mismatches and missing data
+        # Start with 3 base questions, add more if there are many unclear areas
+        mismatches = mismatch_analysis.get("mismatches", [])
+        missing_data = mismatch_analysis.get("missing_data", [])
+        
+        # Count high-severity mismatches
+        high_severity_count = sum(1 for m in mismatches if m.get("severity") == "high")
+        
+        # Dynamic logic: if everything is clear (< 2 high severity, < 3 missing), use 3 questions
+        # Otherwise, use vacancy's max_questions setting
+        if high_severity_count < 2 and len(missing_data) < 3:
+            actual_limit = 3
+        else:
+            actual_limit = max_questions
+        
         return {
             "job_struct": mismatch_analysis.get("job_struct", {}),
             "cv_struct": mismatch_analysis.get("cv_struct", {}),
-            "mismatches": mismatch_analysis.get("mismatches", []),
-            "missing_data": mismatch_analysis.get("missing_data", []),
+            "mismatches": mismatches,
+            "missing_data": missing_data,
             "coverage_snapshot": mismatch_analysis.get("coverage_snapshot", {}),
             "limits": {
-                "max_questions": 3  # Can be increased if needed
+                "max_questions": actual_limit
             },
             "language": language
         }
