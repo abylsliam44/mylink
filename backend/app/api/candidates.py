@@ -13,6 +13,7 @@ from app.models.response import ResponseStatus
 from app.models.vacancy import Vacancy
 
 from pypdf import PdfReader
+from pdfminer.high_level import extract_text as pdfminer_extract_text
 from io import BytesIO
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
@@ -62,9 +63,18 @@ async def upload_candidate_pdf(
         raise HTTPException(status_code=400, detail="Поддерживается только PDF")
     content = await file.read()
     try:
+        # First, try PyPDF text extraction
         reader = PdfReader(BytesIO(content))
         pages = [p.extract_text() or "" for p in reader.pages]
         text = "\n".join(pages).strip()
+        # Fallback to pdfminer if result looks empty (vector text or images)
+        if len(text) < 30:
+            try:
+                text = (pdfminer_extract_text(BytesIO(content)) or "").strip()
+            except Exception:
+                pass
+        if not text:
+            raise ValueError("Не удалось извлечь текст из PDF")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Ошибка чтения PDF: {e}")
 
