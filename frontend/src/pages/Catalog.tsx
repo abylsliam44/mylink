@@ -72,6 +72,48 @@ export default function Catalog() {
     if (!selectedVacancyId && vacancies.length) setSelectedVacancyId(vacancies[0].id)
   }, [vacancies, selectedVacancyId])
 
+  // Check if candidate already applied to selected vacancy
+  useEffect(() => {
+    if (!selectedVacancyId || !candidateId) {
+      setResponseId(null)
+      return
+    }
+    
+    // Try to get existing response for this vacancy
+    api.get(`/responses/candidate/${candidateId}/vacancy/${selectedVacancyId}`)
+      .then(r => {
+        if (r.data && r.data.id) {
+          setResponseId(r.data.id)
+          // Store response_id with vacancy_id as key
+          try { 
+            localStorage.setItem(`response_${candidateId}_${selectedVacancyId}`, r.data.id)
+            console.log('Found existing response:', r.data.id)
+          } catch {}
+        } else {
+          setResponseId(null)
+        }
+      })
+      .catch((err) => {
+        // 404 means no response exists for this vacancy
+        if (err.response?.status === 404) {
+          setResponseId(null)
+        } else {
+          // For other errors, try to load from localStorage
+          try {
+            const stored = localStorage.getItem(`response_${candidateId}_${selectedVacancyId}`)
+            if (stored) {
+              setResponseId(stored)
+              console.log('Loaded response from localStorage:', stored)
+            } else {
+              setResponseId(null)
+            }
+          } catch {
+            setResponseId(null)
+          }
+        }
+      })
+  }, [selectedVacancyId, candidateId])
+
   const filtered = useMemo(() => {
     let list = vacancies
     if (tab === 'almaty') list = list.filter(v => (v.location || '').toLowerCase().includes('алматы') || (v.location || '').toLowerCase().includes('almaty'))
@@ -196,6 +238,15 @@ export default function Catalog() {
           setChatState(prev => ({ ...prev, isCompleted: true }))
         } else if (data.type === 'disconnected') {
           setMessages(prev => [...prev, { sender: 'bot', text: data.message || 'Соединение разорвано' }])
+        } else if (data.type === 'hr_decision') {
+          // HR made a decision (approve/reject) - show message with typewriter effect
+          await typeBotMessage(data.message)
+        } else if (data.type === 'hr_decision_update') {
+          // HR updated their decision - show update message with typewriter effect
+          await typeBotMessage(data.message)
+        } else if (data.type === 'info') {
+          // Info message from backend
+          await typeBotMessage(data.message)
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error)
@@ -266,6 +317,11 @@ export default function Catalog() {
       }
       const response = await api.post('/responses', { candidate_id: cid, vacancy_id: selectedVacancy.id })
       setResponseId(response.data.id)
+      // Store response_id with vacancy_id as key
+      try { 
+        localStorage.setItem(`response_${cid}_${selectedVacancy.id}`, response.data.id)
+        console.log('Saved new response to localStorage:', response.data.id)
+      } catch {}
       setMsg('Спасибо! Отклик отправлен. Теперь вы можете пройти мини-собеседование.')
     } catch (e: any) {
       setErr('Не удалось отправить отклик. Попробуйте ещё раз.')
@@ -365,9 +421,41 @@ export default function Catalog() {
             <div className="card p-4">
               <h3 className="text-[16px] font-semibold text-grayx-900 mb-2">Отклик на вакансию</h3>
               <div className="text-[12px] text-grayx-600 mb-2">Вакансия: <b>{selectedVacancy?.title || '—'}</b> ({selectedVacancy?.location || '—'})</div>
-              <div className="flex gap-2">
-                <button className="btn-primary" onClick={apply} disabled={busy || !selectedVacancy}>Откликнуться</button>
+              
+              {/* Show status if user has applied */}
+              {responseId && (
+                <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded">
+                  <div className="text-xs text-blue-800 font-medium">Статус отклика:</div>
+                  <div className="text-sm text-blue-900 mt-1">
+                    {chatState.isCompleted && chatState.verdict === 'подходит' && '✅ Одобрено'}
+                    {chatState.isCompleted && chatState.verdict !== 'подходит' && '⏳ На рассмотрении'}
+                    {!chatState.isCompleted && messages.length > 0 && '💬 Собеседование в процессе'}
+                    {!chatState.isCompleted && messages.length === 0 && '📝 Ожидает собеседования'}
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex gap-2 flex-wrap">
+                <button className="btn-primary" onClick={apply} disabled={busy || !selectedVacancy || !!responseId}>
+                  {responseId ? 'Уже откликнулись' : 'Откликнуться'}
+                </button>
                 <button className="btn-outline" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>К списку</button>
+                
+                {/* Chat button - show if user has applied */}
+                {responseId && (
+                  <button 
+                    className="btn-primary bg-green-600 hover:bg-green-700" 
+                    onClick={() => {
+                      if (messages.length > 0) {
+                        setShowChatModal(true)
+                      } else {
+                        setShowPreChat(true)
+                      }
+                    }}
+                  >
+                    💬 {messages.length > 0 ? 'Продолжить чат' : 'Открыть чат'}
+                  </button>
+                )}
               </div>
               {msg && <div className="text-sm text-success-600 mt-2">{msg}</div>}
               {err && <div className="text-sm text-danger-600 mt-2">{err}</div>}

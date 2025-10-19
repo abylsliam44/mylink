@@ -46,6 +46,16 @@ export default function Auth() {
     const r = await api.post('/auth/candidate/register', { full_name: fullName, email: cEmail, city, password: cPassword || undefined })
     persistAuthToken(r.data.access_token)
     setRole('candidate')
+    // Save candidate_id to localStorage
+    if (r.data.candidate_id) {
+      try {
+        localStorage.setItem('candidate_id', r.data.candidate_id)
+        localStorage.setItem('candidate_name', fullName)
+        localStorage.setItem('candidate_email', cEmail)
+        localStorage.setItem('candidate_city', city)
+        console.log('Saved candidate_id to localStorage:', r.data.candidate_id)
+      } catch {}
+    }
     setMsg('Регистрация соискателя выполнена.')
     nav('/', { replace: true })
   }
@@ -54,6 +64,14 @@ export default function Auth() {
     const r = await api.post('/auth/candidate/login', { email: cEmail, password: cPassword || undefined })
     persistAuthToken(r.data.access_token)
     setRole('candidate')
+    // Save candidate_id to localStorage
+    if (r.data.candidate_id) {
+      try {
+        localStorage.setItem('candidate_id', r.data.candidate_id)
+        localStorage.setItem('candidate_email', cEmail)
+        console.log('Saved candidate_id to localStorage:', r.data.candidate_id)
+      } catch {}
+    }
     setMsg('Вход выполнен.')
     nav('/', { replace: true })
   }

@@ -6,6 +6,7 @@ from uuid import UUID
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    candidate_id: Optional[UUID] = None  # For candidate login/register
 
 
 class TokenData(BaseModel):

@@ -18,6 +18,48 @@ from app.services.interview_service import interview_service
 router = APIRouter(prefix="/responses", tags=["Responses"])
 
 
+@router.get("/candidate/{candidate_id}/vacancy/{vacancy_id}", response_model=ResponseResponse)
+async def get_candidate_response_for_vacancy(
+    candidate_id: UUID,
+    vacancy_id: UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get existing response for a candidate and vacancy combination"""
+    result = await db.execute(
+        select(CandidateResponse)
+        .where(
+            CandidateResponse.candidate_id == candidate_id,
+            CandidateResponse.vacancy_id == vacancy_id
+        )
+    )
+    response = result.scalar_one_or_none()
+    
+    if not response:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No response found for this candidate and vacancy"
+        )
+    
+    # Get candidate info
+    candidate_result = await db.execute(
+        select(Candidate).where(Candidate.id == response.candidate_id)
+    )
+    candidate = candidate_result.scalar_one_or_none()
+    
+    return ResponseResponse(
+        id=response.id,
+        vacancy_id=response.vacancy_id,
+        candidate_id=response.candidate_id,
+        candidate_name=candidate.full_name if candidate else "Unknown",
+        candidate_email=candidate.email if candidate else "",
+        candidate_city=candidate.city if candidate else "",
+        status=response.status,
+        relevance_score=response.relevance_score,
+        rejection_reasons=response.rejection_reasons,
+        created_at=response.created_at
+    )
+
+
 @router.post("", response_model=ResponseResponse, status_code=status.HTTP_201_CREATED)
 async def create_response(
     response_data: ResponseCreate,
@@ -234,9 +276,13 @@ async def approve_candidate(
     db: AsyncSession = Depends(get_db)
 ):
     """Approve candidate - HR action"""
-    # Verify response exists
+    from sqlalchemy.orm import selectinload
+    
+    # Verify response exists and eagerly load chat_session
     response_result = await db.execute(
-        select(CandidateResponse).where(CandidateResponse.id == response_id)
+        select(CandidateResponse)
+        .options(selectinload(CandidateResponse.chat_session))
+        .where(CandidateResponse.id == response_id)
     )
     response = response_result.scalar_one_or_none()
     
@@ -246,21 +292,28 @@ async def approve_candidate(
             detail="Response not found"
         )
     
+    # Check if already processed
+    if response.status in [ResponseStatus.APPROVED, ResponseStatus.REJECTED]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Candidate already {response.status.value}. Use update endpoint to change decision."
+        )
+    
     # Update status to approved
     response.status = ResponseStatus.APPROVED
     await db.commit()
     await db.refresh(response)
     
     # Send polite message to candidate via chat
+    approval_message = (
+        "🎉 Отличные новости! Наш HR-специалист заинтересовался вашей кандидатурой. "
+        "Поздравляем! Будьте готовы к следующему этапу собеседования. "
+        "Мы свяжемся с вами в ближайшее время для уточнения деталей."
+    )
+    
     if response.chat_session:
         from app.services.chat_service import ChatService
         from app.models.chat import SenderType
-        
-        approval_message = (
-            "🎉 Отличные новости! Наш HR-специалист заинтересовался вашей кандидатурой. "
-            "Поздравляем! Будьте готовы к следующему этапу собеседования. "
-            "Мы свяжемся с вами в ближайшее время для уточнения деталей."
-        )
         
         await ChatService.add_message(
             response.chat_session.id,
@@ -269,6 +322,10 @@ async def approve_candidate(
             db
         )
         await db.commit()
+    
+    # Send message via WebSocket if candidate is connected
+    from app.api.chat import send_message_to_candidate
+    await send_message_to_candidate(response_id, approval_message, "hr_decision")
     
     return {"status": "approved", "message": "Candidate approved successfully"}
 
@@ -279,9 +336,13 @@ async def reject_candidate(
     db: AsyncSession = Depends(get_db)
 ):
     """Reject candidate - HR action"""
-    # Verify response exists
+    from sqlalchemy.orm import selectinload
+    
+    # Verify response exists and eagerly load chat_session
     response_result = await db.execute(
-        select(CandidateResponse).where(CandidateResponse.id == response_id)
+        select(CandidateResponse)
+        .options(selectinload(CandidateResponse.chat_session))
+        .where(CandidateResponse.id == response_id)
     )
     response = response_result.scalar_one_or_none()
     
@@ -291,23 +352,30 @@ async def reject_candidate(
             detail="Response not found"
         )
     
+    # Check if already processed
+    if response.status in [ResponseStatus.APPROVED, ResponseStatus.REJECTED]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Candidate already {response.status.value}. Use update endpoint to change decision."
+        )
+    
     # Update status to rejected
     response.status = ResponseStatus.REJECTED
     await db.commit()
     await db.refresh(response)
     
     # Send polite message to candidate via chat
+    rejection_message = (
+        "Благодарим вас за интерес к нашей вакансии и за время, уделённое собеседованию. "
+        "К сожалению, на данный момент мы приняли решение продолжить поиск кандидата, "
+        "чей профиль более точно соответствует текущим требованиям позиции. "
+        "Мы ценим ваш профессионализм и желаем вам успехов в карьере. "
+        "Возможно, в будущем у нас появятся вакансии, которые лучше подойдут вашему опыту."
+    )
+    
     if response.chat_session:
         from app.services.chat_service import ChatService
         from app.models.chat import SenderType
-        
-        rejection_message = (
-            "Благодарим вас за интерес к нашей вакансии и за время, уделённое собеседованию. "
-            "К сожалению, на данный момент мы приняли решение продолжить поиск кандидата, "
-            "чей профиль более точно соответствует текущим требованиям позиции. "
-            "Мы ценим ваш профессионализм и желаем вам успехов в карьере. "
-            "Возможно, в будущем у нас появятся вакансии, которые лучше подойдут вашему опыту."
-        )
         
         await ChatService.add_message(
             response.chat_session.id,
@@ -317,5 +385,83 @@ async def reject_candidate(
         )
         await db.commit()
     
+    # Send message via WebSocket if candidate is connected
+    from app.api.chat import send_message_to_candidate
+    await send_message_to_candidate(response_id, rejection_message, "hr_decision")
+    
     return {"status": "rejected", "message": "Candidate rejected successfully"}
+
+
+@router.put("/{response_id}/update-decision")
+async def update_decision(
+    response_id: UUID,
+    new_status: str,  # "approved" or "rejected"
+    db: AsyncSession = Depends(get_db)
+):
+    """Update HR decision - allows changing from approved to rejected or vice versa"""
+    from sqlalchemy.orm import selectinload
+    
+    # Validate new_status
+    if new_status not in ["approved", "rejected"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid status. Must be 'approved' or 'rejected'"
+        )
+    
+    # Verify response exists and eagerly load chat_session
+    response_result = await db.execute(
+        select(CandidateResponse)
+        .options(selectinload(CandidateResponse.chat_session))
+        .where(CandidateResponse.id == response_id)
+    )
+    response = response_result.scalar_one_or_none()
+    
+    if not response:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Response not found"
+        )
+    
+    # Check if status is actually changing
+    current_status = response.status
+    target_status = ResponseStatus.APPROVED if new_status == "approved" else ResponseStatus.REJECTED
+    
+    if current_status == target_status:
+        return {"status": new_status, "message": f"Candidate already {new_status}"}
+    
+    # Update status
+    response.status = target_status
+    await db.commit()
+    await db.refresh(response)
+    
+    # Send update message to candidate
+    if new_status == "approved":
+        update_message = (
+            "📝 Обновление: Наш HR-специалист пересмотрел вашу кандидатуру и принял решение продолжить с вами работу. "
+            "Поздравляем! Будьте готовы к следующему этапу собеседования."
+        )
+    else:
+        update_message = (
+            "📝 Обновление: После дополнительного рассмотрения, мы приняли решение продолжить поиск кандидата, "
+            "чей профиль более точно соответствует текущим требованиям позиции. "
+            "Благодарим вас за понимание."
+        )
+    
+    if response.chat_session:
+        from app.services.chat_service import ChatService
+        from app.models.chat import SenderType
+        
+        await ChatService.add_message(
+            response.chat_session.id,
+            SenderType.BOT,
+            update_message,
+            db
+        )
+        await db.commit()
+    
+    # Send message via WebSocket if candidate is connected
+    from app.api.chat import send_message_to_candidate
+    await send_message_to_candidate(response_id, update_message, "hr_decision_update")
+    
+    return {"status": new_status, "message": f"Decision updated to {new_status} successfully"}
 

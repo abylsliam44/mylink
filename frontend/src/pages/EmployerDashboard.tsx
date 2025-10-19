@@ -69,6 +69,7 @@ export default function EmployerDashboard() {
   const loadResponses = async () => {
     const url = vacancyId ? `/responses?vacancy_id=${vacancyId}` : `/responses`
     const res = await api.get(url, { headers: authHeaders })
+    console.log('Loaded responses:', res.data)
     setResponses(res.data)
   }
 
@@ -144,6 +145,11 @@ export default function EmployerDashboard() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 space-y-8">
+      {/* DEBUG BANNER - REMOVE AFTER TESTING */}
+      <div className="bg-red-600 text-white p-4 rounded-lg text-center font-bold text-xl">
+        🔴 DEBUG MODE ACTIVE - VERSION 2.0 - BUTTONS SHOULD BE VISIBLE 🔴
+      </div>
+      
       <section className="bg-white rounded-lg shadow p-4 space-y-3">
         <h2 className="text-lg font-semibold">Auth</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -217,6 +223,11 @@ export default function EmployerDashboard() {
                   💬 История чата
                 </button>
                 
+                {/* Debug: show current status */}
+                <div className="text-xs px-2 py-1 bg-gray-100 rounded">
+                  Status: "{r.status}"
+                </div>
+                
                 {/* Show decision result if already approved/rejected */}
                 {r.status === 'approved' && (
                   <div className="text-sm px-3 py-1.5 bg-green-100 text-green-800 rounded flex items-center gap-2 font-semibold">
@@ -230,46 +241,44 @@ export default function EmployerDashboard() {
                   </div>
                 )}
                 
-                {/* Approve/Reject buttons - only show if not already decided */}
-                {r.status !== 'approved' && r.status !== 'rejected' && (
-                  <>
-                    <button
-                      className="text-sm px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 rounded flex items-center gap-2 transition font-medium"
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        if (confirm(`Одобрить кандидата ${r.candidate_name}?`)) {
-                          try {
-                            await api.post(`/responses/${r.id}/approve`)
-                            alert('Кандидат одобрен! Уведомление отправлено.')
-                            loadResponses()
-                          } catch (err) {
-                            alert('Ошибка при одобрении')
-                          }
-                        }
-                      }}
-                    >
-                      ✅ Одобрить
-                    </button>
-                    
-                    <button
-                      className="text-sm px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded flex items-center gap-2 transition font-medium"
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        if (confirm(`Отклонить кандидата ${r.candidate_name}?`)) {
-                          try {
-                            await api.post(`/responses/${r.id}/reject`)
-                            alert('Кандидат отклонён. Вежливое уведомление отправлено.')
-                            loadResponses()
-                          } catch (err) {
-                            alert('Ошибка при отклонении')
-                          }
-                        }
-                      }}
-                    >
-                      ❌ Отклонить
-                    </button>
-                  </>
-                )}
+                {/* Approve/Reject buttons - ALWAYS SHOW FOR DEBUG */}
+                <button
+                  className="text-sm px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 rounded flex items-center gap-2 transition font-medium"
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    if (confirm(`Одобрить кандидата ${r.candidate_name}?`)) {
+                      try {
+                        await api.post(`/responses/${r.id}/approve`, {}, { headers: authHeaders })
+                        alert('Кандидат одобрен! Уведомление отправлено.')
+                        await loadResponses()
+                      } catch (err) {
+                        console.error('Approve error:', err)
+                        alert('Ошибка при одобрении')
+                      }
+                    }
+                  }}
+                >
+                  ✅ Одобрить
+                </button>
+                
+                <button
+                  className="text-sm px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded flex items-center gap-2 transition font-medium"
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    if (confirm(`Отклонить кандидата ${r.candidate_name}?`)) {
+                      try {
+                        await api.post(`/responses/${r.id}/reject`, {}, { headers: authHeaders })
+                        alert('Кандидат отклонён. Вежливое уведомление отправлено.')
+                        await loadResponses()
+                      } catch (err) {
+                        console.error('Reject error:', err)
+                        alert('Ошибка при отклонении')
+                      }
+                    }
+                  }}
+                >
+                  ❌ Отклонить
+                </button>
               </div>
             </div>
           ))}

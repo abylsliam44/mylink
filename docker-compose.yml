@@ -52,7 +52,7 @@ services:
     build:
       context: ./frontend
     environment:
-      VITE_API_BASE: http://localhost:8010
+      VITE_API_URL: http://localhost:8010
     ports:
       - "8011:5173"
     # Temporarily disabled volume mount to force use of built image

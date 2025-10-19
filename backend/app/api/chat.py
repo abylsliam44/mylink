@@ -19,6 +19,26 @@ router = APIRouter(tags=["Chat"])
 active_connections: Dict[str, WebSocket] = {}
 
 
+async def send_message_to_candidate(response_id: UUID, message: str, message_type: str = "bot_message"):
+    """Send a message to a candidate via WebSocket if they are connected"""
+    connection_key = str(response_id)
+    if connection_key in active_connections:
+        ws = active_connections[connection_key]
+        try:
+            await ws.send_json({
+                "type": message_type,
+                "message": message
+            })
+            return True
+        except Exception as e:
+            print(f"Failed to send message to {response_id}: {e}")
+            # Remove dead connection
+            if connection_key in active_connections:
+                del active_connections[connection_key]
+            return False
+    return False
+
+
 @router.websocket("/ws/chat/{response_id}")
 async def chat_websocket(
     websocket: WebSocket,
@@ -69,10 +89,17 @@ async def chat_websocket(
                 return
 
             # Check if interview already has questions (resume chat)
-            if response.mismatch_analysis and response.dialog_findings:
+            # Check if mismatch_analysis exists and has questions
+            has_existing_questions = (
+                response.mismatch_analysis and 
+                isinstance(response.mismatch_analysis, dict) and
+                response.mismatch_analysis.get("questions")
+            )
+            
+            if has_existing_questions:
                 # Resume existing interview
                 interview_questions = response.mismatch_analysis.get("questions", [])
-                current_question_index = len(response.dialog_findings.get("answers", []))
+                current_question_index = len(response.dialog_findings.get("answers", [])) if response.dialog_findings else 0
 
                 # Send next question if available
                 if current_question_index < len(interview_questions):
@@ -83,6 +110,7 @@ async def chat_websocket(
                     if not response.chat_session:
                         chat_session = await ChatService.create_session(response_id, db)
                         response.chat_session = chat_session
+                        await db.commit()  # Commit immediately to persist chat_session
                     else:
                         chat_session = response.chat_session
 
@@ -101,14 +129,13 @@ async def chat_websocket(
                         "total_questions": len(interview_questions)
                     })
                 else:
-                    # Interview already completed
+                    # Interview already completed - but don't close connection yet
+                    # Just inform the user
                     await websocket.send_json({
-                        "type": "chat_ended",
-                        "message": "Интервью уже завершено",
-                        "completed": True
+                        "type": "info",
+                        "message": "Интервью уже завершено. Ожидаем решения HR."
                     })
                     await db.commit()
-                    break  # Exit the async for loop instead of return
             else:
                 # Start new interview
                 # Update response status to in_chat
@@ -129,6 +156,7 @@ async def chat_websocket(
                 if not response.chat_session:
                     chat_session = await ChatService.create_session(response_id, db)
                     response.chat_session = chat_session
+                    await db.commit()  # Commit immediately to persist chat_session
                 else:
                     chat_session = response.chat_session
 
@@ -153,14 +181,12 @@ async def chat_websocket(
                         "progress": f"Вопрос {current_question_index + 1} из {len(interview_questions)}"
                     })
                 else:
-                    # No questions generated - end interview
+                    # No questions generated - inform user but keep connection open
                     await websocket.send_json({
-                        "type": "chat_ended",
-                        "message": interview_result.get("closing_message", "Интервью завершено. Все данные уже заполнены."),
-                        "completed": True
+                        "type": "info",
+                        "message": interview_result.get("closing_message", "Все данные уже заполнены. Ожидаем решения HR."),
                     })
                     await db.commit()
-                    break  # Exit the async for loop instead of return
 
             # Listen for candidate messages
             while True:
@@ -195,6 +221,7 @@ async def chat_websocket(
                 if not response.chat_session:
                     chat_session = await ChatService.create_session(response_id, db)
                     response.chat_session = chat_session
+                    await db.commit()  # Commit immediately to persist chat_session
 
                 # Save candidate message
                 await ChatService.add_message(

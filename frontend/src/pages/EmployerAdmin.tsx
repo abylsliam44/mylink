@@ -346,27 +346,180 @@ export default function EmployerAdmin() {
 }
 
 function ResponseCard({ response, selected, onSelect, onRun }: { response: any; selected: boolean; onSelect: () => void; onRun: () => void }) {
+  const [showChatModal, setShowChatModal] = useState(false)
+  const [chatHistory, setChatHistory] = useState<any>(null)
+  const [loadingChat, setLoadingChat] = useState(false)
+  
   const pct = typeof response.relevance_score === 'number' ? Math.round(response.relevance_score * 100) : 0
   const badge = pct >= 75 ? 'bg-[#EAF7EE] text-[#16A34A]' : pct >= 60 ? 'bg-[#FFF7E6] text-[#F59E0B]' : 'bg-[#FDECEC] text-[#DC2626]'
+  
+  const loadChatHistory = async () => {
+    setLoadingChat(true)
+    try {
+      const res = await api.get(`/responses/${response.id}/chat`)
+      setChatHistory(res.data)
+      setShowChatModal(true)
+    } catch (e) {
+      console.error('Failed to load chat history:', e)
+      alert('Не удалось загрузить историю чата')
+    } finally {
+      setLoadingChat(false)
+    }
+  }
+  
+  const handleApprove = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (confirm(`Одобрить кандидата ${response.candidate_name}?`)) {
+      try {
+        await api.post(`/responses/${response.id}/approve`)
+        alert('Кандидат одобрен! Уведомление отправлено.')
+        window.location.reload()
+      } catch (err: any) {
+        console.error('Approve error:', err)
+        if (err.response?.status === 400) {
+          alert(err.response?.data?.detail || 'Решение уже принято. Используйте кнопку "Изменить решение".')
+        } else {
+          alert('Ошибка при одобрении')
+        }
+      }
+    }
+  }
+  
+  const handleReject = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (confirm(`Отклонить кандидата ${response.candidate_name}?`)) {
+      try {
+        await api.post(`/responses/${response.id}/reject`)
+        alert('Кандидат отклонён. Вежливое уведомление отправлено.')
+        window.location.reload()
+      } catch (err: any) {
+        console.error('Reject error:', err)
+        if (err.response?.status === 400) {
+          alert(err.response?.data?.detail || 'Решение уже принято. Используйте кнопку "Изменить решение".')
+        } else {
+          alert('Ошибка при отклонении')
+        }
+      }
+    }
+  }
+  
+  const handleUpdateDecision = async (e: React.MouseEvent, newStatus: 'approved' | 'rejected') => {
+    e.stopPropagation()
+    const action = newStatus === 'approved' ? 'одобрить' : 'отклонить'
+    if (confirm(`Изменить решение и ${action} кандидата ${response.candidate_name}?`)) {
+      try {
+        await api.put(`/responses/${response.id}/update-decision?new_status=${newStatus}`)
+        alert(`Решение изменено! Кандидат ${newStatus === 'approved' ? 'одобрен' : 'отклонён'}.`)
+        window.location.reload()
+      } catch (err: any) {
+        console.error('Update decision error:', err)
+        alert('Ошибка при изменении решения')
+      }
+    }
+  }
+  
   return (
-    <div className={`rounded-2xl border ${selected ? 'border-[#4F46E5]' : 'border-[#E6E8EB]'} bg-white shadow-sm p-4`} onClick={onSelect}>
-      <div className="flex items-center justify-between">
-        <div className="min-w-0">
-          <div className="text-[14px] font-medium text-[#0A0A0A] truncate">{response.candidate_name}</div>
-          <div className="text-[12px] text-[#666] truncate">{response.candidate_city || '—'}</div>
+    <>
+      <div className={`rounded-2xl border ${selected ? 'border-[#4F46E5]' : 'border-[#E6E8EB]'} bg-white shadow-sm p-4`} onClick={onSelect}>
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <div className="text-[14px] font-medium text-[#0A0A0A] truncate">{response.candidate_name}</div>
+            <div className="text-[12px] text-[#666] truncate">{response.candidate_city || '—'}</div>
+          </div>
+          <div className={`text-[12px] px-2 py-1 rounded-full ${badge}`}>{pct}%</div>
         </div>
-        <div className={`text-[12px] px-2 py-1 rounded-full ${badge}`}>{pct}%</div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button className="btn-outline text-xs" onClick={(e) => { e.stopPropagation(); onRun(); }}>Запустить ИИ</button>
+          <button 
+            className="btn-outline text-xs" 
+            onClick={(e) => { e.stopPropagation(); loadChatHistory(); }}
+            disabled={loadingChat}
+          >
+            💬 История чата
+          </button>
+          
+          {/* Show status badge if already decided */}
+          {response.status === 'approved' && (
+            <div className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded font-semibold">
+              ✅ Одобрен
+            </div>
+          )}
+          {response.status === 'rejected' && (
+            <div className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded font-semibold">
+              ❌ Отклонён
+            </div>
+          )}
+          
+          {/* Show approve/reject buttons if not decided yet */}
+          {response.status !== 'approved' && response.status !== 'rejected' && (
+            <>
+              <button className="text-xs px-2 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded" onClick={handleApprove}>
+                ✅ Одобрить
+              </button>
+              <button className="text-xs px-2 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded" onClick={handleReject}>
+                ❌ Отклонить
+              </button>
+            </>
+          )}
+          
+          {/* Show update button if already decided */}
+          {(response.status === 'approved' || response.status === 'rejected') && (
+            <div className="flex gap-1">
+              {response.status === 'rejected' && (
+                <button 
+                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded"
+                  onClick={(e) => handleUpdateDecision(e, 'approved')}
+                >
+                  🔄 Изменить на Одобрен
+                </button>
+              )}
+              {response.status === 'approved' && (
+                <button 
+                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded"
+                  onClick={(e) => handleUpdateDecision(e, 'rejected')}
+                >
+                  🔄 Изменить на Отклонён
+                </button>
+              )}
+            </div>
+          )}
+          {response.rejection_reasons && (
+            <details className="border rounded p-2">
+              <summary className="cursor-pointer text-[12px]">Сводка</summary>
+              <pre className="text-xs overflow-auto max-h-64">{JSON.stringify(response.rejection_reasons, null, 2)}</pre>
+            </details>
+          )}
+        </div>
       </div>
-      <div className="mt-3 flex items-center gap-2">
-        <button className="btn-outline" onClick={onRun}>Запустить ИИ</button>
-        {response.rejection_reasons && (
-          <details className="border rounded p-2">
-            <summary className="cursor-pointer text-[12px]">Сводка</summary>
-            <pre className="text-xs overflow-auto max-h-64">{JSON.stringify(response.rejection_reasons, null, 2)}</pre>
-          </details>
-        )}
-      </div>
-    </div>
+      
+      {/* Chat History Modal */}
+      {showChatModal && chatHistory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowChatModal(false)}>
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-auto p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">История чата</h2>
+              <button onClick={() => setShowChatModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+            </div>
+            <div className="space-y-3">
+              {chatHistory.messages && chatHistory.messages.length > 0 ? (
+                chatHistory.messages.map((msg: any) => (
+                  <div key={msg.id} className={`flex ${msg.sender_type === 'candidate' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-md px-4 py-2 rounded-lg ${
+                      msg.sender_type === 'candidate' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'
+                    }`}>
+                      <p className="text-sm">{msg.message_text}</p>
+                      <p className="text-xs mt-1 opacity-70">{new Date(msg.created_at).toLocaleString()}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 text-center">История чата пуста</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
