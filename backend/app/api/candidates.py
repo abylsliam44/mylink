@@ -13,6 +13,7 @@ from app.models.response import ResponseStatus
 from app.models.vacancy import Vacancy
 
 from pypdf import PdfReader
+from io import BytesIO
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
@@ -61,7 +62,7 @@ async def upload_candidate_pdf(
         raise HTTPException(status_code=400, detail="Поддерживается только PDF")
     content = await file.read()
     try:
-        reader = PdfReader(bytes(content))
+        reader = PdfReader(BytesIO(content))
         pages = [p.extract_text() or "" for p in reader.pages]
         text = "\n".join(pages).strip()
     except Exception as e:

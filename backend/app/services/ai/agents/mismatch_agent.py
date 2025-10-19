@@ -7,25 +7,35 @@ from app.services.ai import Agent
 
 
 PROMPT_SYSTEM = (
-    "You are Mismatch Detector for hiring funnel. Normalize JD and CV into compact structures, "
-    "find mismatches, list missing data, and provide short evidences (≤ 12 words). "
-    "Output strictly valid JSON matching the provided schema. Do not include explanations outside JSON."
+    "You are Mismatch Detector for the hiring funnel. Your job: normalize JD and CV into compact,"
+    " factual structures and detect precise mismatches with severity. Prefer concrete facts from the"
+    " CV/JD over heuristics. When CV comes from PDF/OCR, aggressively extract skills, years, cities,"
+    " CEFR levels, and KZT salary numbers. Output strictly valid JSON per schema, no extra text."
+    " Evidence quotes must be ≤ 12 words, verbatim from source."
 )
 
 PROMPT_USER = (
     "Role & Goal:\n"
-    "- Input: raw texts JD and CV.\n"
-    "- Tasks: normalize, detect mismatches, mark missing data, provide micro-evidence.\n"
-    "- Only facts from input; if unknown -> missing_data.\n"
-    "- Skills lowercased; no synonyms; follow controlled vocabularies.\n"
-    "- Severity policy: high (blocker), medium (compensable), low (nice-to-have).\n\n"
+    "- Input: raw JD text and raw CV text (possibly from PDF).\n"
+    "- Tasks: normalize, detect mismatches, mark missing_data, attach micro-evidence.\n"
+    "Extraction rules:\n"
+    "  * Skills: tokenize by commas/lines; normalize to lowercase, dedupe; keep exact tokens (no synonyms).\n"
+    "  * Experience: prefer explicit numbers like '3 years', '2+ лет'; map to total_experience_years.\n"
+    "  * Langs: detect CEFR tokens A1..C2 and map to objects.\n"
+    "  * Education: map keywords bachelor/master/phd/associate/certificate/highschool.\n"
+    "  * Location: city tokens; Employment format: office/hybrid/remote when mentioned.\n"
+    "  * Salary: detect KZT numbers; set salary_expectation.value and unknown=false when present.\n"
+    "Policy:\n"
+    "- Only facts; if absent -> missing_data.\n"
+    "- No synonyms expansion; keep strict vocabularies.\n"
+    "- Severity: high(blocker), medium(compensable), low(cosmetic).\n\n"
     "Input JSON:\n{input_json}\n\n"
     "Output JSON schema EXACTLY (keys and shapes):\n{schema_json}\n\n"
     "Rules:\n"
     "- Strict JSON only.\n"
-    "- Evidence quotes ≤ 12 words each.\n"
+    "- Evidence quotes ≤ 12 words each (verbatim).\n"
     "- No duplication of same mismatch type.\n"
-    "- If JD lacks explicit requirement -> don't produce mismatch, at most unclear_data.\n"
+    "- If JD lacks criterion → do not flag mismatch (use missing_data if needed).\n"
 )
 
 SCHEMA_EXAMPLE = {
