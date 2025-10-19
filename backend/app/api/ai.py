@@ -29,6 +29,7 @@ class Hints(BaseModel):
 class MismatchInput(BaseModel):
     job_text: str
     cv_text: str
+    cv_pdf_b64: Optional[str] = None  # optional base64 PDF to enrich parsing
     hints: Optional[Hints] = None
 
 
