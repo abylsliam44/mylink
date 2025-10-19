@@ -168,10 +168,10 @@ export default function EmployerAdmin() {
 
       {/* KPIs */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <CardKPI title="Всего откликов" value={stats.total} />
+        <CardKPI title="Всего откликов" value={stats.total} icon={<span aria-hidden>📨</span>} />
         <CardKPI title="Средний матч" value={`${stats.avg}%`} toneByValue />
-        <CardKPI title="Подходят" value={stats.passed} />
-        <CardKPI title="Сомн./Не подходят" value={`${stats.borderline}/${stats.failed}`} />
+        <CardKPI title="Подходят" value={stats.passed} icon={<span aria-hidden>{stats.passed > 0 ? '✅' : '⛔️'}</span>} />
+        <CardKPI title="Сомн./Не подходят" value={`${stats.borderline}/${stats.failed}`} icon={<span aria-hidden>{stats.failed > 0 ? '⛔️' : (stats.borderline > 0 ? '⚠️' : '✅')}</span>} />
       </section>
 
       {/* Create vacancy */}
@@ -284,7 +284,7 @@ export default function EmployerAdmin() {
                       </div>
                     )}
                     <div className="flex items-center gap-3">
-                      <Donut value={Math.round(aiData?.scorer?.overall_match_pct ?? (typeof selectedResponse.relevance_score === 'number' ? selectedResponse.relevance_score * 100 : 0))} colorByThresholds={[{max:60,color:'#DC2626'},{min:60,max:75,color:'#F59E0B'},{min:75,color:'#16A34A'}]} />
+                      <Donut value={Math.round(aiData?.scorer?.overall_match_pct ?? (typeof selectedResponse.relevance_score === 'number' ? selectedResponse.relevance_score * 100 : 0))} colorByThresholds={[{max:30,color:'#DC2626'},{min:31,max:50,color:'#F59E0B'},{min:51,color:'#16A34A'}]} />
                       <div className="min-w-0">
                         <div className="text-[14px] text-[#0A0A0A] font-medium truncate">{selectedResponse.candidate_name}</div>
                         <div className="text-[12px] text-[#666] truncate">{selectedResponse.candidate_city}</div>
