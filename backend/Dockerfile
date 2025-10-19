@@ -27,9 +27,8 @@ EXPOSE 8000
 RUN echo '#!/bin/bash\n\
 set -e\n\
 echo "🚀 Starting SmartBot Backend..."\n\
-echo "📝 Applying database migrations..."\n\
-alembic upgrade head\n\
-echo "✅ Migrations applied successfully!"\n\
+echo "📝 Fixing database migration state..."\n\
+python scripts/fix_production_migrations.py\n\
 echo "🌐 Starting server..."\n\
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000\n\
 ' > /app/start.sh && chmod +x /app/start.sh
