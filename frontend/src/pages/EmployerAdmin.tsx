@@ -38,7 +38,7 @@ export default function EmployerAdmin() {
     setLoadingVacancies(true)
     setErrorVacancies('')
     try {
-    const r = await api.get('/vacancies')
+    const r = await api.get('/vacancies/my')  // Changed to /my for employer-specific vacancies
     setVacancies(r.data)
     if (r.data.length && !activeVacancyId) setActiveVacancyId(r.data[0].id)
     } catch (e: any) {
@@ -352,7 +352,7 @@ function ResponseCard({ response, selected, onSelect, onRun }: { response: any; 
   const [loadingChat, setLoadingChat] = useState(false)
 
   const pct = typeof response.relevance_score === 'number' ? Math.round(response.relevance_score * 100) : 0
-  const badge = pct > 50 ? 'bg-[#EAF7EE] text-[#16A34A]' : pct >= 31 ? 'bg-[#FFF7E6] text-[#F59E0B]' : 'bg-[#FDECEC] text-[#DC2626]'
+  // Take from both: use stricter thresholds (75/60) from second version
   const badge = pct >= 75 ? 'bg-[#EAF7EE] text-[#16A34A]' : pct >= 60 ? 'bg-[#FFF7E6] text-[#F59E0B]' : 'bg-[#FDECEC] text-[#DC2626]'
 
   const loadChatHistory = async () => {
