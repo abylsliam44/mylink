@@ -3,6 +3,8 @@ import base64
 from io import BytesIO
 from pypdf import PdfReader
 from pdfminer.high_level import extract_text as pdfminer_extract_text
+from pdf2image import convert_from_bytes
+import pytesseract
 from app.services.ai.agents.mismatch_agent import MismatchDetectorAgent
 
 
@@ -18,6 +20,19 @@ def _extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
     if len(text) < 30:
         try:
             text = (pdfminer_extract_text(BytesIO(pdf_bytes)) or "").strip()
+        except Exception:
+            pass
+    # Final fallback: OCR each page as image via Tesseract
+    if len(text) < 30:
+        try:
+            images = convert_from_bytes(pdf_bytes, fmt='png')
+            ocr_text_parts = []
+            for img in images:
+                try:
+                    ocr_text_parts.append(pytesseract.image_to_string(img, lang='eng+rus'))
+                except Exception:
+                    pass
+            text = "\n".join(ocr_text_parts).strip()
         except Exception:
             pass
     return text
