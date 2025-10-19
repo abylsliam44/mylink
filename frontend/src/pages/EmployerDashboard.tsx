@@ -194,7 +194,7 @@ export default function EmployerDashboard() {
               </div>
               {r.rejection_reasons && <pre className="text-xs mt-1 bg-gray-50 p-2 rounded border">{JSON.stringify(r.rejection_reasons, null, 2)}</pre>}
               
-              <div className="flex gap-2 mt-3">
+              <div className="flex flex-wrap gap-2 mt-3">
                 <button
                   className="text-sm px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded flex items-center gap-2 transition"
                   onClick={(e) => {
@@ -206,17 +206,69 @@ export default function EmployerDashboard() {
                   📊 Просмотреть сводку
                 </button>
                 
-                {(r.status === 'in_chat' || r.status === 'approved' || r.status === 'rejected') && (
-                  <button
-                    className="text-sm px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 rounded flex items-center gap-2 transition"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setViewMode('chat')
-                      setSelectedResponseId(r.id)
-                    }}
-                  >
-                    💬 История чата
-                  </button>
+                <button
+                  className="text-sm px-3 py-1.5 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded flex items-center gap-2 transition"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setViewMode('chat')
+                    setSelectedResponseId(r.id)
+                  }}
+                >
+                  💬 История чата
+                </button>
+                
+                {/* Show decision result if already approved/rejected */}
+                {r.status === 'approved' && (
+                  <div className="text-sm px-3 py-1.5 bg-green-100 text-green-800 rounded flex items-center gap-2 font-semibold">
+                    ✅ Одобрен
+                  </div>
+                )}
+                
+                {r.status === 'rejected' && (
+                  <div className="text-sm px-3 py-1.5 bg-red-100 text-red-800 rounded flex items-center gap-2 font-semibold">
+                    ❌ Отклонён
+                  </div>
+                )}
+                
+                {/* Approve/Reject buttons - only show if not already decided */}
+                {r.status !== 'approved' && r.status !== 'rejected' && (
+                  <>
+                    <button
+                      className="text-sm px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 rounded flex items-center gap-2 transition font-medium"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (confirm(`Одобрить кандидата ${r.candidate_name}?`)) {
+                          try {
+                            await api.post(`/responses/${r.id}/approve`)
+                            alert('Кандидат одобрен! Уведомление отправлено.')
+                            loadResponses()
+                          } catch (err) {
+                            alert('Ошибка при одобрении')
+                          }
+                        }
+                      }}
+                    >
+                      ✅ Одобрить
+                    </button>
+                    
+                    <button
+                      className="text-sm px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded flex items-center gap-2 transition font-medium"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (confirm(`Отклонить кандидата ${r.candidate_name}?`)) {
+                          try {
+                            await api.post(`/responses/${r.id}/reject`)
+                            alert('Кандидат отклонён. Вежливое уведомление отправлено.')
+                            loadResponses()
+                          } catch (err) {
+                            alert('Ошибка при отклонении')
+                          }
+                        }
+                      }}
+                    >
+                      ❌ Отклонить
+                    </button>
+                  </>
                 )}
               </div>
             </div>

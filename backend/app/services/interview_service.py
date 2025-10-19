@@ -13,6 +13,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import json
+import hashlib
 
 from app.models.response import CandidateResponse, ResponseStatus
 from app.models.vacancy import Vacancy
@@ -21,16 +22,72 @@ from app.services.ai.agents.mismatch_agent import MismatchDetectorAgent
 from app.services.ai.agents.question_generator_agent import QuestionGeneratorAgent
 from app.services.ai.agents.relevance_scorer_agent import RelevanceScorerAgent
 from app.services.ai.agents.summary_generator_agent import SummaryGeneratorAgent
+from app.db.redis import get_redis
 
 
 class InterviewService:
     """Service for AI-powered candidate interview orchestration"""
+    
+    CACHE_TTL = 3600  # 1 hour cache TTL
     
     def __init__(self):
         self.mismatch_agent = MismatchDetectorAgent()
         self.question_agent = QuestionGeneratorAgent()
         self.scorer_agent = RelevanceScorerAgent()
         self.summary_agent = SummaryGeneratorAgent()
+    
+    def _generate_cache_key(self, vacancy: Vacancy, candidate: Candidate, dialog_answers_count: int = 0) -> str:
+        """
+        Generate cache key based on vacancy, candidate, and dialog state
+        Cache is invalidated when dialog_answers_count changes
+        """
+        # Create hash from vacancy and candidate data
+        data_str = f"{vacancy.id}:{vacancy.title}:{vacancy.description}:{vacancy.requirements}"
+        data_str += f":{candidate.id}:{candidate.full_name}:{candidate.resume_text}"
+        data_str += f":{dialog_answers_count}"  # Invalidate on new answers
+        
+        hash_obj = hashlib.md5(data_str.encode())
+        return f"interview:analysis:{hash_obj.hexdigest()}"
+    
+    async def _get_cached_analysis(self, cache_key: str) -> Optional[Dict[str, Any]]:
+        """Get cached analysis from Redis"""
+        try:
+            redis = await get_redis()
+            cached = await redis.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception as e:
+            print(f"Redis cache get error: {e}")
+        return None
+    
+    async def _set_cached_analysis(self, cache_key: str, data: Dict[str, Any]):
+        """Set cached analysis in Redis"""
+        try:
+            redis = await get_redis()
+            await redis.setex(
+                cache_key,
+                self.CACHE_TTL,
+                json.dumps(data, default=str)
+            )
+        except Exception as e:
+            print(f"Redis cache set error: {e}")
+    
+    async def _invalidate_cache(self, response_id: UUID, db: AsyncSession):
+        """Invalidate all cache keys for a response"""
+        try:
+            redis = await get_redis()
+            # Get response to build cache key pattern
+            result = await db.execute(
+                select(CandidateResponse).where(CandidateResponse.id == response_id)
+            )
+            response = result.scalar_one_or_none()
+            if response:
+                # Delete all cache keys matching this response
+                pattern = f"interview:analysis:*"
+                async for key in redis.scan_iter(match=pattern):
+                    await redis.delete(key)
+        except Exception as e:
+            print(f"Redis cache invalidation error: {e}")
     
     async def start_interview(
         self, 
@@ -77,33 +134,74 @@ class InterviewService:
         if not candidate:
             raise ValueError(f"Candidate {response.candidate_id} not found")
         
-        # Step 1: Run mismatch detection
-        mismatch_payload = self._build_mismatch_payload(vacancy, candidate)
-        mismatch_analysis = self.mismatch_agent.run(mismatch_payload)
+        # Check if we have cached analysis (if no answers yet)
+        dialog_answers_count = len(response.dialog_findings.get("answers", [])) if response.dialog_findings else 0
+        cache_key = self._generate_cache_key(vacancy, candidate, dialog_answers_count)
         
-        # Step 2: Generate questions based on mismatches
-        question_payload = self._build_question_payload(
-            mismatch_analysis, 
-            vacancy, 
-            candidate,
-            language
-        )
-        questions_result = self.question_agent.run(question_payload)
-        
-        # Step 3: Store analysis in database
-        response.mismatch_analysis = mismatch_analysis
-        response.language_preference = language
-        response.dialog_findings = {
-            "answers": [],
-            "relocation_ready": False,
-            "salary_flex": "",
-            "lang_proofs": [],
-            "other_clarifications": []
-        }
-        response.status = ResponseStatus.IN_CHAT
-        
-        await db.flush()
-        await db.commit()
+        # Check if we already have analysis in DB
+        if response.mismatch_analysis and dialog_answers_count == 0:
+            # We have analysis in DB and no new answers - try cache
+            cached_data = await self._get_cached_analysis(cache_key)
+            if cached_data:
+                # Cache hit! Use existing analysis
+                print(f"✅ Cache HIT for response {response_id}")
+                mismatch_analysis = response.mismatch_analysis
+                questions_result = cached_data.get("questions_result", {})
+            else:
+                # DB has data but cache expired - use DB data and re-cache
+                print(f"🔄 Using DB data for response {response_id}, re-caching")
+                mismatch_analysis = response.mismatch_analysis
+                # Need to regenerate questions from existing analysis
+                question_payload = self._build_question_payload(
+                    mismatch_analysis, 
+                    vacancy, 
+                    candidate,
+                    language
+                )
+                questions_result = self.question_agent.run(question_payload)
+                # Re-cache
+                await self._set_cached_analysis(cache_key, {
+                    "mismatch_analysis": mismatch_analysis,
+                    "questions_result": questions_result
+                })
+        else:
+            # No analysis in DB or answers changed - run AI analysis
+            print(f"❌ Cache MISS for response {response_id} - Running AI analysis")
+            
+            # Step 1: Run mismatch detection
+            mismatch_payload = self._build_mismatch_payload(vacancy, candidate)
+            mismatch_analysis = self.mismatch_agent.run(mismatch_payload)
+            
+            # Step 2: Generate questions based on mismatches
+            question_payload = self._build_question_payload(
+                mismatch_analysis, 
+                vacancy, 
+                candidate,
+                language
+            )
+            questions_result = self.question_agent.run(question_payload)
+            
+            # Step 3: Store analysis in database
+            response.mismatch_analysis = mismatch_analysis
+            if not response.dialog_findings:
+                response.dialog_findings = {
+                    "answers": [],
+                    "relocation_ready": False,
+                    "salary_flex": "",
+                    "lang_proofs": [],
+                    "other_clarifications": []
+                }
+            response.language_preference = language
+            response.status = ResponseStatus.IN_CHAT
+            
+            await db.flush()
+            await db.commit()
+            
+            # Cache the results
+            await self._set_cached_analysis(cache_key, {
+                "mismatch_analysis": mismatch_analysis,
+                "questions_result": questions_result
+            })
         
         return {
             "response_id": str(response_id),
@@ -181,6 +279,10 @@ class InterviewService:
         
         await db.flush()
         await db.commit()
+        
+        # Invalidate cache since dialog state changed
+        await self._invalidate_cache(response_id, db)
+        print(f"🔄 Cache invalidated for response {response_id} after new answer")
         
         return {
             "response_id": str(response_id),

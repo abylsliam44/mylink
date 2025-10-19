@@ -146,9 +146,13 @@ async def get_response_chat_history(
     db: AsyncSession = Depends(get_db)
 ):
     """Get complete chat history for a response"""
-    # Get response
+    from sqlalchemy.orm import selectinload
+    
+    # Get response with chat_session eagerly loaded
     response_result = await db.execute(
-        select(CandidateResponse).where(CandidateResponse.id == response_id)
+        select(CandidateResponse)
+        .options(selectinload(CandidateResponse.chat_session))
+        .where(CandidateResponse.id == response_id)
     )
     response = response_result.scalar_one_or_none()
     
@@ -222,4 +226,96 @@ async def get_response_summary(
         )
     
     return summary
+
+
+@router.post("/{response_id}/approve")
+async def approve_candidate(
+    response_id: UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """Approve candidate - HR action"""
+    # Verify response exists
+    response_result = await db.execute(
+        select(CandidateResponse).where(CandidateResponse.id == response_id)
+    )
+    response = response_result.scalar_one_or_none()
+    
+    if not response:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Response not found"
+        )
+    
+    # Update status to approved
+    response.status = ResponseStatus.APPROVED
+    await db.commit()
+    await db.refresh(response)
+    
+    # Send polite message to candidate via chat
+    if response.chat_session:
+        from app.services.chat_service import ChatService
+        from app.models.chat import SenderType
+        
+        approval_message = (
+            "🎉 Отличные новости! Наш HR-специалист заинтересовался вашей кандидатурой. "
+            "Поздравляем! Будьте готовы к следующему этапу собеседования. "
+            "Мы свяжемся с вами в ближайшее время для уточнения деталей."
+        )
+        
+        await ChatService.add_message(
+            response.chat_session.id,
+            SenderType.BOT,
+            approval_message,
+            db
+        )
+        await db.commit()
+    
+    return {"status": "approved", "message": "Candidate approved successfully"}
+
+
+@router.post("/{response_id}/reject")
+async def reject_candidate(
+    response_id: UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """Reject candidate - HR action"""
+    # Verify response exists
+    response_result = await db.execute(
+        select(CandidateResponse).where(CandidateResponse.id == response_id)
+    )
+    response = response_result.scalar_one_or_none()
+    
+    if not response:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Response not found"
+        )
+    
+    # Update status to rejected
+    response.status = ResponseStatus.REJECTED
+    await db.commit()
+    await db.refresh(response)
+    
+    # Send polite message to candidate via chat
+    if response.chat_session:
+        from app.services.chat_service import ChatService
+        from app.models.chat import SenderType
+        
+        rejection_message = (
+            "Благодарим вас за интерес к нашей вакансии и за время, уделённое собеседованию. "
+            "К сожалению, на данный момент мы приняли решение продолжить поиск кандидата, "
+            "чей профиль более точно соответствует текущим требованиям позиции. "
+            "Мы ценим ваш профессионализм и желаем вам успехов в карьере. "
+            "Возможно, в будущем у нас появятся вакансии, которые лучше подойдут вашему опыту."
+        )
+        
+        await ChatService.add_message(
+            response.chat_session.id,
+            SenderType.BOT,
+            rejection_message,
+            db
+        )
+        await db.commit()
+    
+    return {"status": "rejected", "message": "Candidate rejected successfully"}
 

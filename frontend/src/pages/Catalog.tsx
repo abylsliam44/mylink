@@ -134,22 +134,10 @@ export default function Catalog() {
   }
 
   const handleModalClose = () => {
+    // Just hide modal - don't close WebSocket or clear state
+    // This allows user to resume the chat later
     setShowChatModal(false)
-    if (wsRef.current) {
-      wsRef.current.close()
-      wsRef.current = null
-    }
-    setMessages([])
-    setChatState({
-      questionIndex: 0,
-      totalQuestions: 0,
-      currentScore: 0,
-      isCompleted: false,
-      isPaused: false,
-      verdict: '',
-      finalScore: 0,
-      estimatedTimeMinutes: 2
-    })
+    // WebSocket stays open, messages and state persist
   }
 
   const handlePauseChat = () => {
@@ -177,11 +165,12 @@ export default function Catalog() {
     ws.onopen = () => {
       setMessages(prev => [...prev, { sender: 'bot', text: 'Соединение установлено. Ожидание вопросов...' }])
     }
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
       try {
         const data = JSON.parse(event.data)
         if (data.type === 'bot_message' && data.message) {
-          setMessages(prev => [...prev, { sender: 'bot', text: data.message }])
+          // Use typewriter effect for bot messages
+          await typeBotMessage(data.message)
           const remaining = (data.total_questions || 0) - (data.question_index || 0) - 1
           const estimatedMinutes = Math.max(1, Math.ceil((remaining * 30) / 60))
           setChatState(prev => ({
@@ -193,10 +182,6 @@ export default function Catalog() {
             isCompleted: false
           }))
         } else if (data.type === 'chat_ended') {
-          setMessages(prev => [...prev, {
-            sender: 'bot',
-            text: `Чат завершен. Оценка: ${data.final_score || 0}%, Вердикт: ${data.verdict || 'Неизвестно'}`
-          }])
           setChatState(prev => ({
             ...prev,
             isCompleted: true,
@@ -204,10 +189,10 @@ export default function Catalog() {
             finalScore: data.final_score || prev.finalScore
           }))
         } else if (data.type === 'chat_paused') {
-          setMessages(prev => [...prev, { sender: 'bot', text: data.message || 'Собеседование приостановлено' }])
+          await typeBotMessage(data.message || 'Собеседование приостановлено. Вы можете продолжить в любое время.')
           setChatState(prev => ({ ...prev, isPaused: true }))
         } else if (data.type === 'chat_cancelled') {
-          setMessages(prev => [...prev, { sender: 'bot', text: data.message || 'Собеседование отменено' }])
+          await typeBotMessage(data.message || 'Собеседование отменено.')
           setChatState(prev => ({ ...prev, isCompleted: true }))
         } else if (data.type === 'disconnected') {
           setMessages(prev => [...prev, { sender: 'bot', text: data.message || 'Соединение разорвано' }])
@@ -221,6 +206,28 @@ export default function Catalog() {
     }
     ws.onerror = () => {
       try { ws.close() } catch {}
+    }
+  }
+
+  // Typewriter effect for bot messages (like ChatGPT)
+  const typeBotMessage = async (text: string) => {
+    let insertIndex = -1
+    setMessages(prev => {
+      insertIndex = prev.length
+      return [...prev, { sender: 'bot' as const, text: '' }]
+    })
+    
+    const speed = 15 // milliseconds per character
+    for (let i = 1; i <= text.length; i++) {
+      await new Promise(res => setTimeout(res, speed))
+      const slice = text.slice(0, i)
+      setMessages(prev => {
+        const arr = [...prev]
+        if (arr[insertIndex]) {
+          arr[insertIndex] = { sender: 'bot' as const, text: slice }
+        }
+        return arr
+      })
     }
   }
 
@@ -370,17 +377,26 @@ export default function Catalog() {
       </div>
 
       {/* Floating Chat Button */}
-      {responseId && (
+      {responseId && !showChatModal && (
         <div className="fixed bottom-6 right-6 z-50">
           <button
-            onClick={() => setShowPreChat(true)}
+            onClick={() => {
+              // If chat already started, resume it directly
+              if (messages.length > 0) {
+                setShowChatModal(true)
+              } else {
+                setShowPreChat(true)
+              }
+            }}
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-2xl flex items-center gap-3 transition-all hover:scale-105 animate-bounce"
             style={{ animationDuration: '2s' }}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
-            <span className="font-medium">Пройти мини-собеседование (~2 мин)</span>
+            <span className="font-medium">
+              {messages.length > 0 ? 'Продолжить собеседование' : 'Пройти мини-собеседование (~2 мин)'}
+            </span>
           </button>
         </div>
       )}
@@ -454,15 +470,6 @@ export default function Catalog() {
                       ≈ {chatState.estimatedTimeMinutes} мин
                     </span>
                   </div>
-                  {chatState.currentScore > 0 && (
-                    <span className={`font-medium px-2 py-1 rounded text-xs ${
-                      chatState.currentScore >= 70 ? 'bg-green-100 text-green-800' :
-                      chatState.currentScore >= 50 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      Оценка: {chatState.currentScore}%
-                    </span>
-                  )}
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
@@ -490,20 +497,15 @@ export default function Catalog() {
             )}
 
             {chatState.isCompleted && (
-              <div className="bg-gray-50 p-4 space-y-2">
-                <h3 className="font-medium text-gray-900">Собеседование завершено!</h3>
-                <div className="flex items-center gap-4">
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    chatState.verdict === 'подходит' ? 'bg-green-100 text-green-800' :
-                    chatState.verdict === 'сомнительно' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {chatState.verdict === 'подходит' ? '✅ Подходит' :
-                     chatState.verdict === 'сомнительно' ? '⚠️ Сомнительно' : '❌ Не подходит'}
-                  </span>
-                  <span className="text-lg font-bold text-gray-900">
-                    Итоговая оценка: {chatState.finalScore}%
-                  </span>
+              <div className="bg-blue-50 p-4 border-b border-blue-200">
+                <div className="flex items-center gap-3">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <h3 className="font-medium text-gray-900">Спасибо за ваши ответы!</h3>
+                    <p className="text-sm text-gray-600">Мы получили вашу информацию и свяжемся с вами в ближайшее время.</p>
+                  </div>
                 </div>
               </div>
             )}
