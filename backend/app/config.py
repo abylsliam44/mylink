@@ -17,7 +17,9 @@ class Settings(BaseSettings):
     
     # App
     DEBUG: bool = True
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+    # Strict production frontend origin (Vercel)
+    ALLOWED_ORIGINS: str = "https://mylink-rouge.vercel.app"
+    # No regex wildcard; only exact origin above is allowed
     ALLOWED_ORIGIN_REGEX: str | None = None
 
     # AI / OpenAI

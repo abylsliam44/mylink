@@ -2,11 +2,16 @@ import axios from 'axios'
 
 // Backend origin for direct connections (WS, non-proxied calls)
 const DEFAULT_BACKEND = 'https://mylink-trn6.onrender.com'
-// For HTTP requests in browser we prefer proxy '/api' via Vercel rewrites.
-// If VITE_API_URL задан, используем его напрямую (локальная разработка/стенд).
-const HTTP_BASE = (import.meta.env.VITE_API_URL as string | undefined) || '/api'
-// Для WebSocket и построения wsUrl нужен полный origin бэка:
-const BACKEND_ORIGIN = (import.meta.env.VITE_API_URL as string | undefined) || (window as any).__API_BASE__ || DEFAULT_BACKEND
+
+// In production, hardcode the only allowed frontend origin and use same-origin '/api'.
+const isProd = import.meta.env.PROD === true
+const PROD_FRONTEND = 'https://mylink-rouge.vercel.app'
+const HTTP_BASE = isProd ? '/api' : ((import.meta.env.VITE_API_URL as string | undefined) || '/api')
+
+// Для WebSocket и построения wsUrl нужен полный origin бэка (может быть кросс-доменным)
+const BACKEND_ORIGIN = isProd
+  ? DEFAULT_BACKEND
+  : ((import.meta.env.VITE_API_URL as string | undefined) || (window as any).__API_BASE__ || DEFAULT_BACKEND)
 
 export const API_BASE: string = String(BACKEND_ORIGIN)
 
