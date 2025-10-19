@@ -22,5 +22,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Create startup script that runs migrations and starts the server
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "🚀 Starting SmartBot Backend..."\n\
+echo "📝 Applying database migrations..."\n\
+alembic upgrade head\n\
+echo "✅ Migrations applied successfully!"\n\
+echo "🌐 Starting server..."\n\
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000\n\
+' > /app/start.sh && chmod +x /app/start.sh
+
+CMD ["/app/start.sh"]
 
