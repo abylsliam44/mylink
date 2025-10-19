@@ -47,7 +47,9 @@ export default function Catalog() {
 
   // Load vacancies
   useEffect(() => {
-    api.get('/vacancies').then(r => setVacancies(r.data)).catch(() => setVacancies([]))
+    api.get('/vacancies/public')
+      .then(r => setVacancies(r.data))
+      .catch(() => setVacancies([]))
   }, [])
 
   useEffect(() => {

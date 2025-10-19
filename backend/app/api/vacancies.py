@@ -70,6 +70,15 @@ async def list_vacancies(
     return vacancies
 
 
+@router.get("/public", response_model=List[VacancyResponse])
+async def list_public_vacancies(
+    db: AsyncSession = Depends(get_db)
+):
+    """Public list of vacancies for candidates (no auth required)."""
+    result = await db.execute(select(Vacancy).order_by(Vacancy.created_at.desc()))
+    return result.scalars().all()
+
+
 @router.put("/{vacancy_id}", response_model=VacancyResponse)
 async def update_vacancy(
     vacancy_id: UUID,
