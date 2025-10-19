@@ -29,6 +29,7 @@ PROMPT_USER = (
     "- Only facts; if absent -> missing_data.\n"
     "- No synonyms expansion; keep strict vocabularies.\n"
     "- Severity: high(blocker), medium(compensable), low(cosmetic).\n\n"
+    "When hints.must_have_skills is provided: for each token do an exact, case-insensitive check in CV text; if found, include it in cv_struct.skills (lowercased).\n"
     "Input JSON:\n{input_json}\n\n"
     "Output JSON schema EXACTLY (keys and shapes):\n{schema_json}\n\n"
     "Rules:\n"

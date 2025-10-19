@@ -104,6 +104,13 @@ class RelevanceScorerAgent(Agent):
         # Skills pct
         req_skills = _skills_set(job.get("required_skills"))
         cv_skills = _skills_set(cv.get("skills"))
+        # If CV skills are empty but must_have provided and present in notes text, try naive boost
+        if not cv_skills and must_have_skills and isinstance(cv.get("notes"), str):
+            low = cv.get("notes").lower()
+            for s in must_have_skills:
+                token = str(s).strip().lower()
+                if token and (f" {token} " in f" {low} "):
+                    cv_skills.add(token)
         skills_pct, skills_note = self._calc_skills_pct(req_skills, cv_skills, must_have_skills, findings)
 
         # Education pct
