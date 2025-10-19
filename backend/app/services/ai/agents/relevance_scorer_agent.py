@@ -145,17 +145,14 @@ class RelevanceScorerAgent(Agent):
         # Verdict
         must_have_covered = _has_all(_skills_set(must_have_skills), cv_skills)
         serious_risk = self._has_serious_risk(mismatches)
-        fit_thr = int(thresholds.get("fit") or 75)
-        borderline_thr = int(thresholds.get("borderline") or 60)
-        # If skills zero or location very low with office/hybrid, be conservative
-        if scores_pct.get("skills", 0) == 0 or (scores_pct.get("location", 100) <= 40 and (job.get("location_requirement") or {}).get("employment_type") in {"office", "hybrid"}):
-            borderline_thr = max(borderline_thr, 60)
-        if overall >= fit_thr and must_have_covered and scores_pct.get("skills", 0) >= 60:
-            verdict = "подходит"
-        elif overall < 30 or serious_risk:
+        # Business rule override: 0–30 fail, 31–50 borderline, >50 fit
+        # Keep must-have gate: if not covered, downgrade to borderline
+        if overall <= 30 or serious_risk:
             verdict = "не подходит"
-        else:
+        elif overall <= 50 or not must_have_covered:
             verdict = "сомнительно"
+        else:
+            verdict = "подходит"
 
         # Summary
         summary = self._build_summary(job, cv, scores_pct, mismatches, missing_data, findings)

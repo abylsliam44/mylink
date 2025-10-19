@@ -75,10 +75,11 @@ export default function EmployerAdmin() {
 
   const stats = useMemo(() => {
     const total = filtered.length
-    const passed = filtered.filter(r => (r.relevance_score || 0) >= 0.75).length
-    const borderline = filtered.filter(r => (r.relevance_score || 0) >= 0.6 && (r.relevance_score || 0) < 0.75).length
-    const failed = total - passed - borderline
-    const avg = total ? Math.round((filtered.reduce((a, r) => a + (r.relevance_score || 0), 0) / total) * 100) : 0
+    const pct = (r: any) => (typeof r.relevance_score === 'number' ? Math.round(r.relevance_score * 100) : 0)
+    const passed = filtered.filter(r => pct(r) > 50).length
+    const borderline = filtered.filter(r => pct(r) >= 31 && pct(r) <= 50).length
+    const failed = filtered.filter(r => pct(r) <= 30).length
+    const avg = total ? Math.round(filtered.reduce((a, r) => a + pct(r), 0) / total) : 0
     return { total, passed, borderline, failed, avg }
   }, [filtered])
 
@@ -168,7 +169,7 @@ export default function EmployerAdmin() {
       {/* KPIs */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <CardKPI title="Всего откликов" value={stats.total} />
-        <CardKPI title="Средний матч" value={`${stats.avg}%`} />
+        <CardKPI title="Средний матч" value={`${stats.avg}%`} toneByValue />
         <CardKPI title="Подходят" value={stats.passed} />
         <CardKPI title="Сомн./Не подходят" value={`${stats.borderline}/${stats.failed}`} />
       </section>
@@ -347,7 +348,7 @@ export default function EmployerAdmin() {
 
 function ResponseCard({ response, selected, onSelect, onRun }: { response: any; selected: boolean; onSelect: () => void; onRun: () => void }) {
   const pct = typeof response.relevance_score === 'number' ? Math.round(response.relevance_score * 100) : 0
-  const badge = pct >= 75 ? 'bg-[#EAF7EE] text-[#16A34A]' : pct >= 60 ? 'bg-[#FFF7E6] text-[#F59E0B]' : 'bg-[#FDECEC] text-[#DC2626]'
+  const badge = pct > 50 ? 'bg-[#EAF7EE] text-[#16A34A]' : pct >= 31 ? 'bg-[#FFF7E6] text-[#F59E0B]' : 'bg-[#FDECEC] text-[#DC2626]'
   return (
     <div className={`rounded-2xl border ${selected ? 'border-[#4F46E5]' : 'border-[#E6E8EB]'} bg-white shadow-sm p-4`} onClick={onSelect}>
       <div className="flex items-center justify-between">
