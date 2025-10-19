@@ -40,18 +40,19 @@ async def create_vacancy(
 @router.get("/{vacancy_id}", response_model=VacancyResponse)
 async def get_vacancy(
     vacancy_id: UUID,
+    current_employer: Employer = Depends(get_current_employer),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get vacancy by ID"""
+    """Get vacancy by ID (only if owned by current employer)"""
     result = await db.execute(
-        select(Vacancy).where(Vacancy.id == vacancy_id)
+        select(Vacancy).where(Vacancy.id == vacancy_id, Vacancy.employer_id == current_employer.id)
     )
     vacancy = result.scalar_one_or_none()
     
     if not vacancy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vacancy not found"
+            detail="Vacancy not found or you don't have permission"
         )
     
     return vacancy
@@ -59,18 +60,13 @@ async def get_vacancy(
 
 @router.get("", response_model=List[VacancyResponse])
 async def list_vacancies(
-    employer_id: UUID = None,
+    current_employer: Employer = Depends(get_current_employer),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all vacancies, optionally filtered by employer"""
-    query = select(Vacancy)
-    
-    if employer_id:
-        query = query.where(Vacancy.employer_id == employer_id)
-    
+    """List vacancies owned by current employer"""
+    query = select(Vacancy).where(Vacancy.employer_id == current_employer.id)
     result = await db.execute(query.order_by(Vacancy.created_at.desc()))
     vacancies = result.scalars().all()
-    
     return vacancies
 
 

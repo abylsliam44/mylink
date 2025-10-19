@@ -52,13 +52,13 @@ services:
     build:
       context: ./frontend
     environment:
-      VITE_API_URL: http://localhost:8010
+      # Inside docker network, refer to backend by service name
+      VITE_API_BASE: http://backend:8000
     ports:
       - "8011:5173"
-    # Temporarily disabled volume mount to force use of built image
-    # volumes:
-    #   - ./frontend:/app
-    #   - /app/node_modules
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
     depends_on:
       - backend

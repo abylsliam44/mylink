@@ -75,10 +75,11 @@ export default function EmployerAdmin() {
 
   const stats = useMemo(() => {
     const total = filtered.length
-    const passed = filtered.filter(r => (r.relevance_score || 0) >= 0.75).length
-    const borderline = filtered.filter(r => (r.relevance_score || 0) >= 0.6 && (r.relevance_score || 0) < 0.75).length
-    const failed = total - passed - borderline
-    const avg = total ? Math.round((filtered.reduce((a, r) => a + (r.relevance_score || 0), 0) / total) * 100) : 0
+    const pct = (r: any) => (typeof r.relevance_score === 'number' ? Math.round(r.relevance_score * 100) : 0)
+    const passed = filtered.filter(r => pct(r) > 50).length
+    const borderline = filtered.filter(r => pct(r) >= 31 && pct(r) <= 50).length
+    const failed = filtered.filter(r => pct(r) <= 30).length
+    const avg = total ? Math.round(filtered.reduce((a, r) => a + pct(r), 0) / total) : 0
     return { total, passed, borderline, failed, avg }
   }, [filtered])
 
@@ -167,10 +168,10 @@ export default function EmployerAdmin() {
 
       {/* KPIs */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <CardKPI title="Всего откликов" value={stats.total} />
-        <CardKPI title="Средний матч" value={`${stats.avg}%`} />
-        <CardKPI title="Подходят" value={stats.passed} />
-        <CardKPI title="Сомн./Не подходят" value={`${stats.borderline}/${stats.failed}`} />
+        <CardKPI title="Всего откликов" value={stats.total} icon={<span aria-hidden>📨</span>} />
+        <CardKPI title="Средний матч" value={`${stats.avg}%`} toneByValue />
+        <CardKPI title="Подходят" value={stats.passed} icon={<span aria-hidden>{stats.passed > 0 ? '✅' : '⛔️'}</span>} />
+        <CardKPI title="Сомн./Не подходят" value={`${stats.borderline}/${stats.failed}`} icon={<span aria-hidden>{stats.failed > 0 ? '⛔️' : (stats.borderline > 0 ? '⚠️' : '✅')}</span>} />
       </section>
 
       {/* Create vacancy */}
@@ -283,7 +284,7 @@ export default function EmployerAdmin() {
                       </div>
                     )}
                     <div className="flex items-center gap-3">
-                      <Donut value={Math.round(aiData?.scorer?.overall_match_pct ?? (typeof selectedResponse.relevance_score === 'number' ? selectedResponse.relevance_score * 100 : 0))} colorByThresholds={[{max:60,color:'#DC2626'},{min:60,max:75,color:'#F59E0B'},{min:75,color:'#16A34A'}]} />
+                      <Donut value={Math.round(aiData?.scorer?.overall_match_pct ?? (typeof selectedResponse.relevance_score === 'number' ? selectedResponse.relevance_score * 100 : 0))} colorByThresholds={[{max:30,color:'#DC2626'},{min:31,max:50,color:'#F59E0B'},{min:51,color:'#16A34A'}]} />
                       <div className="min-w-0">
                         <div className="text-[14px] text-[#0A0A0A] font-medium truncate">{selectedResponse.candidate_name}</div>
                         <div className="text-[12px] text-[#666] truncate">{selectedResponse.candidate_city}</div>
@@ -349,10 +350,11 @@ function ResponseCard({ response, selected, onSelect, onRun }: { response: any; 
   const [showChatModal, setShowChatModal] = useState(false)
   const [chatHistory, setChatHistory] = useState<any>(null)
   const [loadingChat, setLoadingChat] = useState(false)
-  
+
   const pct = typeof response.relevance_score === 'number' ? Math.round(response.relevance_score * 100) : 0
+  const badge = pct > 50 ? 'bg-[#EAF7EE] text-[#16A34A]' : pct >= 31 ? 'bg-[#FFF7E6] text-[#F59E0B]' : 'bg-[#FDECEC] text-[#DC2626]'
   const badge = pct >= 75 ? 'bg-[#EAF7EE] text-[#16A34A]' : pct >= 60 ? 'bg-[#FFF7E6] text-[#F59E0B]' : 'bg-[#FDECEC] text-[#DC2626]'
-  
+
   const loadChatHistory = async () => {
     setLoadingChat(true)
     try {
@@ -366,7 +368,7 @@ function ResponseCard({ response, selected, onSelect, onRun }: { response: any; 
       setLoadingChat(false)
     }
   }
-  
+
   const handleApprove = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (confirm(`Одобрить кандидата ${response.candidate_name}?`)) {
@@ -384,7 +386,7 @@ function ResponseCard({ response, selected, onSelect, onRun }: { response: any; 
       }
     }
   }
-  
+
   const handleReject = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (confirm(`Отклонить кандидата ${response.candidate_name}?`)) {
@@ -402,7 +404,7 @@ function ResponseCard({ response, selected, onSelect, onRun }: { response: any; 
       }
     }
   }
-  
+
   const handleUpdateDecision = async (e: React.MouseEvent, newStatus: 'approved' | 'rejected') => {
     e.stopPropagation()
     const action = newStatus === 'approved' ? 'одобрить' : 'отклонить'
@@ -417,7 +419,7 @@ function ResponseCard({ response, selected, onSelect, onRun }: { response: any; 
       }
     }
   }
-  
+
   return (
     <>
       <div className={`rounded-2xl border ${selected ? 'border-[#4F46E5]' : 'border-[#E6E8EB]'} bg-white shadow-sm p-4`} onClick={onSelect}>
@@ -430,14 +432,14 @@ function ResponseCard({ response, selected, onSelect, onRun }: { response: any; 
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button className="btn-outline text-xs" onClick={(e) => { e.stopPropagation(); onRun(); }}>Запустить ИИ</button>
-          <button 
-            className="btn-outline text-xs" 
+          <button
+            className="btn-outline text-xs"
             onClick={(e) => { e.stopPropagation(); loadChatHistory(); }}
             disabled={loadingChat}
           >
             💬 История чата
           </button>
-          
+
           {/* Show status badge if already decided */}
           {response.status === 'approved' && (
             <div className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded font-semibold">
@@ -449,7 +451,7 @@ function ResponseCard({ response, selected, onSelect, onRun }: { response: any; 
               ❌ Отклонён
             </div>
           )}
-          
+
           {/* Show approve/reject buttons if not decided yet */}
           {response.status !== 'approved' && response.status !== 'rejected' && (
             <>
@@ -461,12 +463,12 @@ function ResponseCard({ response, selected, onSelect, onRun }: { response: any; 
               </button>
             </>
           )}
-          
+
           {/* Show update button if already decided */}
           {(response.status === 'approved' || response.status === 'rejected') && (
             <div className="flex gap-1">
               {response.status === 'rejected' && (
-                <button 
+                <button
                   className="text-xs px-2 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded"
                   onClick={(e) => handleUpdateDecision(e, 'approved')}
                 >
@@ -474,7 +476,7 @@ function ResponseCard({ response, selected, onSelect, onRun }: { response: any; 
                 </button>
               )}
               {response.status === 'approved' && (
-                <button 
+                <button
                   className="text-xs px-2 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded"
                   onClick={(e) => handleUpdateDecision(e, 'rejected')}
                 >
@@ -491,7 +493,7 @@ function ResponseCard({ response, selected, onSelect, onRun }: { response: any; 
           )}
         </div>
       </div>
-      
+
       {/* Chat History Modal */}
       {showChatModal && chatHistory && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowChatModal(false)}>

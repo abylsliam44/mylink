@@ -7,25 +7,36 @@ from app.services.ai import Agent
 
 
 PROMPT_SYSTEM = (
-    "You are Mismatch Detector for hiring funnel. Normalize JD and CV into compact structures, "
-    "find mismatches, list missing data, and provide short evidences (≤ 12 words). "
-    "Output strictly valid JSON matching the provided schema. Do not include explanations outside JSON."
+    "You are a deterministic Mismatch Detector for hiring. You must output STRICT JSON matching the schema. "
+    "Goal: build factual job_struct/cv_struct and detect mismatches with severity. Use only explicit evidence. "
+    "Be aggressive in extraction from messy PDF/OCR: scan bullet lists, tables, and inline sentences. "
+    "Normalize tokens: lowercase skills; CEFR A1..C2; employment_type=office|hybrid|remote; KZT salary numbers. "
+    "IMPORTANT: Do NOT invent skills. If a must-have token occurs in CV text even once, include it in cv_struct.skills. "
+    "Evidence quotes must be ≤12 words, verbatim."
 )
 
 PROMPT_USER = (
     "Role & Goal:\n"
-    "- Input: raw texts JD and CV.\n"
-    "- Tasks: normalize, detect mismatches, mark missing data, provide micro-evidence.\n"
-    "- Only facts from input; if unknown -> missing_data.\n"
-    "- Skills lowercased; no synonyms; follow controlled vocabularies.\n"
-    "- Severity policy: high (blocker), medium (compensable), low (nice-to-have).\n\n"
+    "- Input: raw JD text and raw CV text (possibly from PDF).\n"
+    "- Tasks: normalize, detect mismatches, mark missing_data, attach micro-evidence.\n"
+    "Extraction rules:\n"
+    "  * Skills: tokenize by commas/lines and exact token scan across CV text; lowercase, dedupe; no synonyms.\n"
+    "  * Experience: prefer explicit numbers like '3 years', '2+ лет'; map to total_experience_years.\n"
+    "  * Langs: detect CEFR A1..C2; return best level objects.\n"
+    "  * Education: normalize to bachelor/master/phd/associate/certificate/highschool.\n"
+    "  * Location & format: city names + office/hybrid/remote.\n"
+    "  * Salary: detect KZT amounts and set salary_expectation.value with unknown=false when seen.\n"
+    "Policy:\n"
+    "- Only facts; if absent -> missing_data. No invention.\n"
+    "- Severity: high(blocker), medium(compensable), low(cosmetic).\n"
+    "- If hints.must_have_skills provided: for each token, do case-insensitive search in CV text; when found, add to cv_struct.skills.\n\n"
     "Input JSON:\n{input_json}\n\n"
     "Output JSON schema EXACTLY (keys and shapes):\n{schema_json}\n\n"
     "Rules:\n"
     "- Strict JSON only.\n"
-    "- Evidence quotes ≤ 12 words each.\n"
+    "- Evidence quotes ≤ 12 words each (verbatim).\n"
     "- No duplication of same mismatch type.\n"
-    "- If JD lacks explicit requirement -> don't produce mismatch, at most unclear_data.\n"
+    "- If JD lacks criterion → do NOT emit mismatch (use missing_data instead).\n"
 )
 
 SCHEMA_EXAMPLE = {

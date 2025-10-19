@@ -103,7 +103,17 @@ class RelevanceScorerAgent(Agent):
 
         # Skills pct
         req_skills = _skills_set(job.get("required_skills"))
+        # If JD didn't return a list but there are must-have hints → use them for scoring
+        if not req_skills and must_have_skills:
+            req_skills = _skills_set(must_have_skills)
         cv_skills = _skills_set(cv.get("skills"))
+        # If CV skills are empty but must_have provided and present in notes text, try naive boost
+        if not cv_skills and must_have_skills and isinstance(cv.get("notes"), str):
+            low = cv.get("notes").lower()
+            for s in must_have_skills:
+                token = str(s).strip().lower()
+                if token and (f" {token} " in f" {low} "):
+                    cv_skills.add(token)
         skills_pct, skills_note = self._calc_skills_pct(req_skills, cv_skills, must_have_skills, findings)
 
         # Education pct
@@ -145,14 +155,14 @@ class RelevanceScorerAgent(Agent):
         # Verdict
         must_have_covered = _has_all(_skills_set(must_have_skills), cv_skills)
         serious_risk = self._has_serious_risk(mismatches)
-        fit_thr = int(thresholds.get("fit") or 75)
-        borderline_thr = int(thresholds.get("borderline") or 60)
-        if overall >= fit_thr and must_have_covered:
-            verdict = "подходит"
-        elif overall >= borderline_thr or serious_risk:
+        # Business rule override: 0–30 fail, 31–50 borderline, >50 fit
+        # Keep must-have gate: if not covered, downgrade to borderline
+        if overall <= 30 or serious_risk:
+            verdict = "не подходит"
+        elif overall <= 50 or not must_have_covered:
             verdict = "сомнительно"
         else:
-            verdict = "не подходит"
+            verdict = "подходит"
 
         # Summary
         summary = self._build_summary(job, cv, scores_pct, mismatches, missing_data, findings)

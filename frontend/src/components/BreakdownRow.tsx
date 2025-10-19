@@ -1,7 +1,7 @@
 export function BreakdownRow({ label, pct }: { label: string; pct: number | null | undefined }) {
   if (pct === null || pct === undefined) return null
   const value = Math.max(0, Math.min(100, Math.round(pct)))
-  const bar = value >= 75 ? '#16A34A' : value >= 60 ? '#F59E0B' : '#DC2626'
+  const bar = value > 50 ? '#16A34A' : value >= 31 ? '#F59E0B' : '#DC2626'
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-[12px] leading-[18px] text-[#0A0A0A]">

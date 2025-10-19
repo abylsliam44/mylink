@@ -13,6 +13,8 @@ from app.models.candidate import Candidate
 from app.models.response import CandidateResponse
 from app.models.candidate import Candidate as CandidateModel
 from app.services.ai.llm_client import get_llm
+from app.utils.auth import get_current_employer
+from app.models.employer import Employer
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
@@ -27,6 +29,7 @@ class Hints(BaseModel):
 class MismatchInput(BaseModel):
     job_text: str
     cv_text: str
+    cv_pdf_b64: Optional[str] = None  # optional base64 PDF to enrich parsing
     hints: Optional[Hints] = None
 
 
@@ -136,7 +139,7 @@ class PipelineByIdsInput(BaseModel):
 
 
 @router.post("/pipeline/screen_by_ids")
-async def pipeline_screen_by_ids(body: PipelineByIdsInput, db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
+async def pipeline_screen_by_ids(body: PipelineByIdsInput, current_employer: Employer = Depends(get_current_employer), db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
     """Run screening pipeline using vacancy/candidate data from DB. Optionally persist score into CandidateResponse."""
     # Load DB entities
     v_res = await db.execute(select(Vacancy).where(Vacancy.id == body.vacancy_id))
@@ -145,6 +148,9 @@ async def pipeline_screen_by_ids(body: PipelineByIdsInput, db: AsyncSession = De
     candidate = c_res.scalar_one_or_none()
     if not vacancy or not candidate:
         raise HTTPException(status_code=404, detail="Vacancy or Candidate not found")
+    # Ownership check: vacancy must belong to current employer
+    if vacancy.employer_id != current_employer.id:
+        raise HTTPException(status_code=403, detail="Not allowed for this vacancy")
 
     # Assemble texts and hints
     job_text = f"{vacancy.title or ''}. {vacancy.description or ''}"
