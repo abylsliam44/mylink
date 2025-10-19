@@ -52,7 +52,8 @@ services:
     build:
       context: ./frontend
     environment:
-      VITE_API_BASE: http://localhost:8010
+      # Inside docker network, refer to backend by service name
+      VITE_API_BASE: http://backend:8000
     ports:
       - "8011:5173"
     volumes:
