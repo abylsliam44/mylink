@@ -103,6 +103,9 @@ class RelevanceScorerAgent(Agent):
 
         # Skills pct
         req_skills = _skills_set(job.get("required_skills"))
+        # If JD didn't return a list but there are must-have hints → use them for scoring
+        if not req_skills and must_have_skills:
+            req_skills = _skills_set(must_have_skills)
         cv_skills = _skills_set(cv.get("skills"))
         # If CV skills are empty but must_have provided and present in notes text, try naive boost
         if not cv_skills and must_have_skills and isinstance(cv.get("notes"), str):

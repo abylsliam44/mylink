@@ -7,11 +7,12 @@ from app.services.ai import Agent
 
 
 PROMPT_SYSTEM = (
-    "You are Mismatch Detector for the hiring funnel. Your job: normalize JD and CV into compact,"
-    " factual structures and detect precise mismatches with severity. Prefer concrete facts from the"
-    " CV/JD over heuristics. When CV comes from PDF/OCR, aggressively extract skills, years, cities,"
-    " CEFR levels, and KZT salary numbers. Output strictly valid JSON per schema, no extra text."
-    " Evidence quotes must be ≤ 12 words, verbatim from source."
+    "You are a deterministic Mismatch Detector for hiring. You must output STRICT JSON matching the schema. "
+    "Goal: build factual job_struct/cv_struct and detect mismatches with severity. Use only explicit evidence. "
+    "Be aggressive in extraction from messy PDF/OCR: scan bullet lists, tables, and inline sentences. "
+    "Normalize tokens: lowercase skills; CEFR A1..C2; employment_type=office|hybrid|remote; KZT salary numbers. "
+    "IMPORTANT: Do NOT invent skills. If a must-have token occurs in CV text even once, include it in cv_struct.skills. "
+    "Evidence quotes must be ≤12 words, verbatim."
 )
 
 PROMPT_USER = (
@@ -19,24 +20,23 @@ PROMPT_USER = (
     "- Input: raw JD text and raw CV text (possibly from PDF).\n"
     "- Tasks: normalize, detect mismatches, mark missing_data, attach micro-evidence.\n"
     "Extraction rules:\n"
-    "  * Skills: tokenize by commas/lines; normalize to lowercase, dedupe; keep exact tokens (no synonyms).\n"
+    "  * Skills: tokenize by commas/lines and exact token scan across CV text; lowercase, dedupe; no synonyms.\n"
     "  * Experience: prefer explicit numbers like '3 years', '2+ лет'; map to total_experience_years.\n"
-    "  * Langs: detect CEFR tokens A1..C2 and map to objects.\n"
-    "  * Education: map keywords bachelor/master/phd/associate/certificate/highschool.\n"
-    "  * Location: city tokens; Employment format: office/hybrid/remote when mentioned.\n"
-    "  * Salary: detect KZT numbers; set salary_expectation.value and unknown=false when present.\n"
+    "  * Langs: detect CEFR A1..C2; return best level objects.\n"
+    "  * Education: normalize to bachelor/master/phd/associate/certificate/highschool.\n"
+    "  * Location & format: city names + office/hybrid/remote.\n"
+    "  * Salary: detect KZT amounts and set salary_expectation.value with unknown=false when seen.\n"
     "Policy:\n"
-    "- Only facts; if absent -> missing_data.\n"
-    "- No synonyms expansion; keep strict vocabularies.\n"
-    "- Severity: high(blocker), medium(compensable), low(cosmetic).\n\n"
-    "When hints.must_have_skills is provided: for each token do an exact, case-insensitive check in CV text; if found, include it in cv_struct.skills (lowercased).\n"
+    "- Only facts; if absent -> missing_data. No invention.\n"
+    "- Severity: high(blocker), medium(compensable), low(cosmetic).\n"
+    "- If hints.must_have_skills provided: for each token, do case-insensitive search in CV text; when found, add to cv_struct.skills.\n\n"
     "Input JSON:\n{input_json}\n\n"
     "Output JSON schema EXACTLY (keys and shapes):\n{schema_json}\n\n"
     "Rules:\n"
     "- Strict JSON only.\n"
     "- Evidence quotes ≤ 12 words each (verbatim).\n"
     "- No duplication of same mismatch type.\n"
-    "- If JD lacks criterion → do not flag mismatch (use missing_data if needed).\n"
+    "- If JD lacks criterion → do NOT emit mismatch (use missing_data instead).\n"
 )
 
 SCHEMA_EXAMPLE = {
