@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Response
 from contextlib import asynccontextmanager
 import logging
 
@@ -8,6 +9,9 @@ from app.api import auth, employers, vacancies, candidates, responses, chat
 from app.api import ai as ai_router
 from app.db.redis import close_redis
 from app.services.ai.registry_setup import register_all_agents
+from app.db.base import Base
+from app.db.session import async_engine
+from app import models as _models  # noqa: F401 ensure models are imported for metadata
 
 # Configure logging
 logging.basicConfig(
@@ -25,6 +29,14 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting SmartBot Backend...")
     logger.info(f"Debug mode: {settings.DEBUG}")
+    # Ensure DB tables exist (safety for environments without migrations)
+    try:
+        from sqlalchemy.exc import SQLAlchemyError
+        async with async_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables ensured (create_all)")
+    except Exception as e:
+        logger.exception("Failed ensuring DB schema: %s", e)
     # Register AI agents
     register_all_agents()
     logger.info("AI agents registered")
@@ -49,10 +61,16 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,
+    allow_origin_regex=settings.ALLOWED_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Ensure preflight returns 204 even if route doesn't exist
+@app.options("/{rest_of_path:path}")
+async def options_handler(rest_of_path: str):
+    return Response(status_code=204)
 
 # Include routers
 app.include_router(auth.router)

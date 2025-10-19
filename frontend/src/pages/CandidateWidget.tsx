@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, API_BASE, wsUrl } from '../lib/api'
+import { api, wsUrl } from '../lib/api'
 
 // PreChatScreen Component
 function PreChatScreen({
