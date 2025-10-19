@@ -20,79 +20,44 @@ def run_command(command):
     return True
 
 
-async def check_and_add_missing_columns():
-    """Check if missing columns exist and add them if needed"""
+def add_missing_columns_direct():
+    """Add missing columns using direct SQL commands"""
     try:
-        from app.db.session import get_db
-        from sqlalchemy import text
+        import os
+        import subprocess
         
-        print("🔍 Checking for missing columns in candidate_responses table...")
+        # Get database URL from environment
+        database_url = os.getenv('DATABASE_URL')
+        if not database_url:
+            print("❌ DATABASE_URL not found")
+            return False
         
-        # Get database session
-        async for db in get_db():
-            # Check if mismatch_analysis column exists
-            result = await db.execute(text("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'candidate_responses' 
-                AND column_name = 'mismatch_analysis'
-            """))
-            mismatch_exists = result.fetchone() is not None
+        print("🔍 Adding missing columns to candidate_responses table...")
+        
+        # Use psql to execute SQL commands directly
+        sql_commands = [
+            "ALTER TABLE candidate_responses ADD COLUMN IF NOT EXISTS mismatch_analysis JSONB;",
+            "ALTER TABLE candidate_responses ADD COLUMN IF NOT EXISTS dialog_findings JSONB;", 
+            "ALTER TABLE candidate_responses ADD COLUMN IF NOT EXISTS language_preference VARCHAR(5) DEFAULT 'ru';"
+        ]
+        
+        for sql in sql_commands:
+            print(f"➕ Executing: {sql}")
+            result = subprocess.run([
+                'psql', database_url, '-c', sql
+            ], capture_output=True, text=True)
             
-            # Check if dialog_findings column exists
-            result = await db.execute(text("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'candidate_responses' 
-                AND column_name = 'dialog_findings'
-            """))
-            dialog_exists = result.fetchone() is not None
-            
-            # Check if language_preference column exists
-            result = await db.execute(text("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'candidate_responses' 
-                AND column_name = 'language_preference'
-            """))
-            lang_exists = result.fetchone() is not None
-            
-            # Add missing columns
-            if not mismatch_exists:
-                print("➕ Adding mismatch_analysis column...")
-                await db.execute(text("""
-                    ALTER TABLE candidate_responses 
-                    ADD COLUMN mismatch_analysis JSONB
-                """))
-                await db.commit()
-                print("✅ mismatch_analysis column added")
-            
-            if not dialog_exists:
-                print("➕ Adding dialog_findings column...")
-                await db.execute(text("""
-                    ALTER TABLE candidate_responses 
-                    ADD COLUMN dialog_findings JSONB
-                """))
-                await db.commit()
-                print("✅ dialog_findings column added")
-            
-            if not lang_exists:
-                print("➕ Adding language_preference column...")
-                await db.execute(text("""
-                    ALTER TABLE candidate_responses 
-                    ADD COLUMN language_preference VARCHAR(5) NOT NULL DEFAULT 'ru'
-                """))
-                await db.commit()
-                print("✅ language_preference column added")
-            
-            print("✅ All required columns are now present")
-            break
-            
+            if result.returncode != 0:
+                print(f"⚠️  Warning: {sql} - {result.stderr}")
+            else:
+                print(f"✅ Success: {sql}")
+        
+        print("✅ All required columns are now present")
+        return True
+        
     except Exception as e:
-        print(f"❌ Error checking/adding columns: {e}")
+        print(f"❌ Error adding columns: {e}")
         return False
-    
-    return True
 
 
 def main():
@@ -111,7 +76,7 @@ def main():
     
     # Add missing columns if needed
     print("\n🔧 Adding missing columns...")
-    asyncio.run(check_and_add_missing_columns())
+    add_missing_columns_direct()
     
     # Mark the initial migration as applied (since tables already exist)
     print("\n🏷️  Marking initial migration as applied...")
