@@ -14,13 +14,28 @@ class ChatService:
     """Service for handling chat logic"""
     
     @staticmethod
-    async def create_session(response_id: UUID, db: AsyncSession) -> ChatSession:
-        """Create a new chat session"""
+    async def get_or_create_session(response_id: UUID, db: AsyncSession) -> ChatSession:
+        """Get existing session or create a new one"""
+        # Try to find existing session
+        result = await db.execute(
+            select(ChatSession).where(ChatSession.response_id == response_id)
+        )
+        session = result.scalar_one_or_none()
+        
+        if session:
+            return session
+        
+        # Create new session if not found
         session = ChatSession(response_id=response_id)
         db.add(session)
         await db.flush()
         await db.refresh(session)
         return session
+    
+    @staticmethod
+    async def create_session(response_id: UUID, db: AsyncSession) -> ChatSession:
+        """Create a new chat session (deprecated - use get_or_create_session)"""
+        return await ChatService.get_or_create_session(response_id, db)
     
     @staticmethod
     async def add_message(

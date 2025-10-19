@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api'
+import InterviewSummary from '../components/InterviewSummary'
+import ChatHistory from '../components/ChatHistory'
 
 export default function EmployerDashboard() {
   const [token, setToken] = useState<string | null>(null)
@@ -21,6 +23,8 @@ export default function EmployerDashboard() {
 
   // Responses
   const [responses, setResponses] = useState<any[]>([])
+  const [selectedResponseId, setSelectedResponseId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'summary' | 'chat'>('summary')
 
   // AI Mismatch quick test
   const [jobText, setJobText] = useState('Python backend developer, FastAPI, PostgreSQL, Docker, office in Almaty, EN B2')
@@ -65,6 +69,7 @@ export default function EmployerDashboard() {
   const loadResponses = async () => {
     const url = vacancyId ? `/responses?vacancy_id=${vacancyId}` : `/responses`
     const res = await api.get(url, { headers: authHeaders })
+    console.log('Loaded responses:', res.data)
     setResponses(res.data)
   }
 
@@ -140,6 +145,11 @@ export default function EmployerDashboard() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 space-y-8">
+      {/* DEBUG BANNER - REMOVE AFTER TESTING */}
+      <div className="bg-red-600 text-white p-4 rounded-lg text-center font-bold text-xl">
+        🔴 DEBUG MODE ACTIVE - VERSION 2.0 - BUTTONS SHOULD BE VISIBLE 🔴
+      </div>
+      
       <section className="bg-white rounded-lg shadow p-4 space-y-3">
         <h2 className="text-lg font-semibold">Auth</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -178,15 +188,148 @@ export default function EmployerDashboard() {
         </div>
         <div className="mt-3 divide-y">
           {responses.map((r) => (
-            <div key={r.id} className="py-3">
+            <div key={r.id} className="py-3 hover:bg-gray-50 transition rounded px-2">
               <div className="font-medium">{r.candidate_name} — {r.candidate_email} — {r.candidate_city}</div>
-              <div className="text-sm text-gray-600">status: {r.status} | score: {r.relevance_score ?? 'n/a'}</div>
+              <div className="text-sm text-gray-600 mb-2">
+                status: <span className={`font-semibold ${
+                  r.status === 'approved' ? 'text-green-600' :
+                  r.status === 'rejected' ? 'text-red-600' :
+                  r.status === 'in_chat' ? 'text-blue-600' :
+                  'text-gray-600'
+                }`}>{r.status}</span> | score: {r.relevance_score ? `${Math.round(r.relevance_score * 100)}%` : 'n/a'}
+              </div>
               {r.rejection_reasons && <pre className="text-xs mt-1 bg-gray-50 p-2 rounded border">{JSON.stringify(r.rejection_reasons, null, 2)}</pre>}
+              
+              <div className="flex flex-wrap gap-2 mt-3">
+                <button
+                  className="text-sm px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded flex items-center gap-2 transition"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setViewMode('summary')
+                    setSelectedResponseId(r.id)
+                  }}
+                >
+                  📊 Просмотреть сводку
+                </button>
+                
+                <button
+                  className="text-sm px-3 py-1.5 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded flex items-center gap-2 transition"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setViewMode('chat')
+                    setSelectedResponseId(r.id)
+                  }}
+                >
+                  💬 История чата
+                </button>
+                
+                {/* Debug: show current status */}
+                <div className="text-xs px-2 py-1 bg-gray-100 rounded">
+                  Status: "{r.status}"
+                </div>
+                
+                {/* Show decision result if already approved/rejected */}
+                {r.status === 'approved' && (
+                  <div className="text-sm px-3 py-1.5 bg-green-100 text-green-800 rounded flex items-center gap-2 font-semibold">
+                    ✅ Одобрен
+                  </div>
+                )}
+                
+                {r.status === 'rejected' && (
+                  <div className="text-sm px-3 py-1.5 bg-red-100 text-red-800 rounded flex items-center gap-2 font-semibold">
+                    ❌ Отклонён
+                  </div>
+                )}
+                
+                {/* Approve/Reject buttons - ALWAYS SHOW FOR DEBUG */}
+                <button
+                  className="text-sm px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 rounded flex items-center gap-2 transition font-medium"
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    if (confirm(`Одобрить кандидата ${r.candidate_name}?`)) {
+                      try {
+                        await api.post(`/responses/${r.id}/approve`, {}, { headers: authHeaders })
+                        alert('Кандидат одобрен! Уведомление отправлено.')
+                        await loadResponses()
+                      } catch (err) {
+                        console.error('Approve error:', err)
+                        alert('Ошибка при одобрении')
+                      }
+                    }
+                  }}
+                >
+                  ✅ Одобрить
+                </button>
+                
+                <button
+                  className="text-sm px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded flex items-center gap-2 transition font-medium"
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    if (confirm(`Отклонить кандидата ${r.candidate_name}?`)) {
+                      try {
+                        await api.post(`/responses/${r.id}/reject`, {}, { headers: authHeaders })
+                        alert('Кандидат отклонён. Вежливое уведомление отправлено.')
+                        await loadResponses()
+                      } catch (err) {
+                        console.error('Reject error:', err)
+                        alert('Ошибка при отклонении')
+                      }
+                    }
+                  }}
+                >
+                  ❌ Отклонить
+                </button>
+              </div>
             </div>
           ))}
           {responses.length === 0 && <div className="text-sm text-gray-500">No responses yet</div>}
         </div>
       </section>
+
+      {/* Summary/Chat Modal */}
+      {selectedResponseId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-auto">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-auto relative">
+            <div className="sticky top-0 z-10 bg-white border-b flex items-center justify-between p-4">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setViewMode('summary')}
+                  className={`px-4 py-2 rounded ${
+                    viewMode === 'summary' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  📊 Сводка
+                </button>
+                <button
+                  onClick={() => setViewMode('chat')}
+                  className={`px-4 py-2 rounded ${
+                    viewMode === 'chat' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  💬 История чата
+                </button>
+              </div>
+              <button
+                onClick={() => setSelectedResponseId(null)}
+                className="text-gray-400 hover:text-gray-600 text-2xl bg-white rounded-full w-8 h-8 flex items-center justify-center"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-4">
+              {viewMode === 'summary' ? (
+                <InterviewSummary responseId={selectedResponseId} />
+              ) : (
+                <ChatHistory responseId={selectedResponseId} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="bg-white rounded-lg shadow p-4 space-y-3">
         <h2 className="text-lg font-semibold">AI: End-to-End Screening</h2>

@@ -68,7 +68,7 @@ async def candidate_register(body: CandidateRegister, db: AsyncSession = Depends
         await db.flush()
     # Return token embedding candidate id in sub (prefix for clarity)
     token = create_access_token(data={"sub": str(cand.id), "email": cand.email, "role": "candidate"})
-    return Token(access_token=token, token_type="bearer")
+    return Token(access_token=token, token_type="bearer", candidate_id=cand.id)
 
 
 class CandidateLogin(BaseModel):
@@ -83,5 +83,5 @@ async def candidate_login(body: CandidateLogin, db: AsyncSession = Depends(get_d
     if not cand:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Candidate not found")
     token = create_access_token(data={"sub": str(cand.id), "email": cand.email, "role": "candidate"})
-    return Token(access_token=token, token_type="bearer")
+    return Token(access_token=token, token_type="bearer", candidate_id=cand.id)
 

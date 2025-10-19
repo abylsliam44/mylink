@@ -68,7 +68,18 @@ async def get_vacancy(
 
 
 @router.get("", response_model=List[VacancyResponse])
-async def list_vacancies(
+async def list_all_vacancies(
+    db: AsyncSession = Depends(get_db)
+):
+    """List all vacancies (public endpoint for candidates)"""
+    query = select(Vacancy)
+    result = await db.execute(query.order_by(Vacancy.created_at.desc()))
+    vacancies = result.scalars().all()
+    return vacancies
+
+
+@router.get("/my", response_model=List[VacancyResponse])
+async def list_my_vacancies(
     current_employer: Employer = Depends(get_current_employer),
     db: AsyncSession = Depends(get_db)
 ):
