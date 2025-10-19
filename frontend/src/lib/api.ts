@@ -1,7 +1,9 @@
 import axios from 'axios'
 
-const DEFAULT_API = 'http://localhost:8000'
-const rawBase = import.meta.env.VITE_API_BASE || (window as any).__API_BASE__ || DEFAULT_API
+// Hard-coded production API base to avoid missing envs on Vercel
+const DEFAULT_API = 'https://mylink-trn6.onrender.com'
+// Allow override via window.__API_BASE__ or env for local/testing
+const rawBase = (window as any).__API_BASE__ || import.meta.env.VITE_API_BASE || DEFAULT_API
 
 export const API_BASE: string = String(rawBase)
 
