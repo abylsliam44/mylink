@@ -38,9 +38,9 @@ export default function EmployerAdmin() {
     setLoadingVacancies(true)
     setErrorVacancies('')
     try {
-      const r = await api.get('/vacancies')
-      setVacancies(r.data)
-      if (r.data.length && !activeVacancyId) setActiveVacancyId(r.data[0].id)
+    const r = await api.get('/vacancies')
+    setVacancies(r.data)
+    if (r.data.length && !activeVacancyId) setActiveVacancyId(r.data[0].id)
     } catch (e: any) {
       setErrorVacancies(e?.response?.data?.detail || 'Ошибка загрузки вакансий')
     } finally {
@@ -52,8 +52,8 @@ export default function EmployerAdmin() {
     setLoadingResponses(true)
     setErrorResponses('')
     try {
-      const r = await api.get(`/responses?vacancy_id=${vacancyId}`)
-      setResponses(r.data)
+    const r = await api.get(`/responses?vacancy_id=${vacancyId}`)
+    setResponses(r.data)
       if (r.data.length) setSelectedResponse(r.data[0])
     } catch (e: any) {
       setErrorResponses(e?.response?.data?.detail || 'Ошибка загрузки откликов')
@@ -251,7 +251,7 @@ export default function EmployerAdmin() {
                       <div className="h-3 w-64 bg-[#F1F3F5] rounded" />
                     </div>
                   ))}
-                </div>
+              </div>
               )}
               {!loadingResponses && filtered.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-[#E6E8EB] bg-white p-8 text-center text-[14px] text-[#666]">Отклики ожидают данные</div>
@@ -313,15 +313,15 @@ export default function EmployerAdmin() {
                       <div>
                         <div className="text-[12px] text-[#666] mb-1">Зоны роста и риски</div>
                         <RiskCarousel items={aiData?.scorer?.summary?.risks || []} />
-                      </div>
-                    </div>
+              </div>
+            </div>
                     <div className="grid grid-cols-3 gap-2">
                       <button className="btn-primary col-span-2 transition-base" onClick={runPipelineForSelected} disabled={aiLoading}>Отправить приглашение</button>
                       <button className="btn-outline transition-base" onClick={runPipelineForSelected} disabled={aiLoading}>Уточнить</button>
                     </div>
                     {aiError && <div className="text-[12px] text-[#DC2626]" role="alert" aria-live="polite">{aiError}</div>}
                     <div className="text-[12px] text-[#666]">Обновлено {aiData ? 'только что' : '—'}</div>
-                  </div>
+          </div>
                 )}
               </div>
             </aside>

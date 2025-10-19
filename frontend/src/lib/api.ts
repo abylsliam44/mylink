@@ -1,13 +1,16 @@
 import axios from 'axios'
 
-// Hard-coded production API base to avoid missing envs on Vercel
-const DEFAULT_API = 'https://mylink-trn6.onrender.com'
-// Allow override via window.__API_BASE__ or env for local/testing
-const rawBase = (window as any).__API_BASE__ || import.meta.env.VITE_API_BASE || DEFAULT_API
+// Backend origin for direct connections (WS, non-proxied calls)
+const DEFAULT_BACKEND = 'https://mylink-trn6.onrender.com'
+// For HTTP requests in browser we prefer proxy '/api' via Vercel rewrites.
+// If VITE_API_URL задан, используем его напрямую (локальная разработка/стенд).
+const HTTP_BASE = (import.meta.env.VITE_API_URL as string | undefined) || '/api'
+// Для WebSocket и построения wsUrl нужен полный origin бэка:
+const BACKEND_ORIGIN = (import.meta.env.VITE_API_URL as string | undefined) || (window as any).__API_BASE__ || DEFAULT_BACKEND
 
-export const API_BASE: string = String(rawBase)
+export const API_BASE: string = String(BACKEND_ORIGIN)
 
-export const api = axios.create({ baseURL: API_BASE, timeout: 30000 })
+export const api = axios.create({ baseURL: HTTP_BASE, timeout: 30000 })
 
 export function setAuthToken(token: string | null) {
   if (token) {
