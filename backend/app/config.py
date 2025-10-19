@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # App
     DEBUG: bool = True
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+    ALLOWED_ORIGIN_REGEX: str | None = None
 
     # AI / OpenAI
     OPENAI_API_KEY: str | None = None

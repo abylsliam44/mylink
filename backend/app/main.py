@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Response
 from contextlib import asynccontextmanager
 import logging
 
@@ -49,10 +50,16 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,
+    allow_origin_regex=settings.ALLOWED_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Ensure preflight returns 204 even if route doesn't exist
+@app.options("/{rest_of_path:path}")
+async def options_handler(rest_of_path: str):
+    return Response(status_code=204)
 
 # Include routers
 app.include_router(auth.router)
