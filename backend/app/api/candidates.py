@@ -12,8 +12,8 @@ from app.models.response import CandidateResponse as RespModel
 from app.models.response import ResponseStatus
 from app.models.vacancy import Vacancy
 
-from pypdf import PdfReader
-from pdfminer.high_level import extract_text as pdfminer_extract_text
+from pdf2image import convert_from_bytes
+import pytesseract
 from io import BytesIO
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
@@ -63,18 +63,20 @@ async def upload_candidate_pdf(
         raise HTTPException(status_code=400, detail="Поддерживается только PDF")
     content = await file.read()
     try:
-        # First, try PyPDF text extraction
-        reader = PdfReader(BytesIO(content))
-        pages = [p.extract_text() or "" for p in reader.pages]
-        text = "\n".join(pages).strip()
-        # Fallback to pdfminer if result looks empty (vector text or images)
-        if len(text) < 30:
+        # Use OCR Tesseract to extract text from PDF
+        images = convert_from_bytes(content, fmt='png', dpi=300)
+        ocr_text_parts = []
+        for img in images:
             try:
-                text = (pdfminer_extract_text(BytesIO(content)) or "").strip()
-            except Exception:
+                ocr_text = pytesseract.image_to_string(img, lang='eng+rus')
+                if ocr_text.strip():
+                    ocr_text_parts.append(ocr_text.strip())
+            except Exception as e:
+                print(f"OCR error for page: {e}")
                 pass
+        text = "\n".join(ocr_text_parts).strip()
         if not text:
-            raise ValueError("Не удалось извлечь текст из PDF")
+            raise ValueError("Не удалось извлечь текст из PDF через OCR")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Ошибка чтения PDF: {e}")
 

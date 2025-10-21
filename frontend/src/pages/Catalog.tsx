@@ -158,7 +158,8 @@ export default function Catalog() {
         localStorage.setItem('candidate_resume_snippet', snippet)
         setResumeSnippet(snippet)
       } catch {}
-      setMsg('Резюме загружено и сохранено')
+      setMsg('PDF загружен! Теперь заполните профиль для точной оценки.')
+      setShowResumeEditor(true)
     } catch (e: any) {
       setErr('Не удалось загрузить PDF. Попробуйте ещё раз.')
     } finally {
@@ -302,31 +303,105 @@ export default function Catalog() {
 
   // Apply with existing candidateId, or create lightweight profile
   const apply = async () => {
-    if (!selectedVacancy) return
+    if (!selectedVacancy) {
+      setErr('Выберите вакансию для отклика')
+      return
+    }
+    
+    // Validate required fields
+    if (!fullName.trim()) {
+      setErr('Укажите ваше ФИО')
+      return
+    }
+    if (!email.trim()) {
+      setErr('Укажите ваш email')
+      return
+    }
+    if (!email.includes('@')) {
+      setErr('Укажите корректный email')
+      return
+    }
+    
     setBusy(true); setErr(''); setMsg('')
     try {
       let cid = candidateId
       if (!cid) {
-        if (!fullName || !email) {
-          setErr('Укажите ФИО и E‑mail или загрузите резюме PDF')
+        try {
+          const c = await api.post('/candidates', { full_name: fullName, email, city: city || '—', resume_text: resumeSnippet || '' })
+          cid = c.data.id
+          setCandidateId(cid)
+          try { 
+            localStorage.setItem('candidate_id', cid as string)
+            localStorage.setItem('candidate_name', fullName)
+            localStorage.setItem('candidate_email', email)
+            localStorage.setItem('candidate_city', city)
+          } catch {}
+        } catch (e: any) {
+          console.error('Candidate creation error:', e)
+          setErr('Не удалось создать профиль кандидата. Попробуйте ещё раз.')
           setBusy(false)
           return
         }
-        const c = await api.post('/candidates', { full_name: fullName, email, city: city || '—', resume_text: resumeSnippet || '' })
-        cid = c.data.id
-        setCandidateId(cid)
-        try { localStorage.setItem('candidate_id', cid as string) } catch {}
       }
-      const response = await api.post('/responses', { candidate_id: cid, vacancy_id: selectedVacancy.id })
-      setResponseId(response.data.id)
-      // Store response_id with vacancy_id as key
-      try { 
-        localStorage.setItem(`response_${cid}_${selectedVacancy.id}`, response.data.id)
-        console.log('Saved new response to localStorage:', response.data.id)
-      } catch {}
-      setMsg('Спасибо! Отклик отправлен. Теперь вы можете пройти мини-собеседование.')
+      
+      // Check if profile is filled (has skills, experience, etc.)
+      try {
+        const profileResponse = await api.get(`/candidates/${cid}/profile`)
+        const profile = profileResponse.data
+        
+        // Check if profile exists and has required data
+        if (!profile || typeof profile !== 'object') {
+          setErr('Профиль не найден. Заполните профиль полностью.')
+          setShowResumeEditor(true)
+          setBusy(false)
+          return
+        }
+        
+        const hasSkills = profile.skills && Array.isArray(profile.skills) && profile.skills.length > 0 && profile.skills.some((s: string) => s && s.trim())
+        const hasExperience = profile.experience && Array.isArray(profile.experience) && profile.experience.length > 0 && profile.experience.some((exp: any) => exp && exp.company && exp.title)
+        
+        if (!hasSkills || !hasExperience) {
+          setErr('Для точной оценки заполните профиль: навыки и опыт работы')
+          setShowResumeEditor(true)
+          setBusy(false)
+          return
+        }
+      } catch (e: any) {
+        console.error('Profile check error:', e)
+        setErr('Ошибка проверки профиля. Заполните профиль полностью.')
+        setShowResumeEditor(true)
+        setBusy(false)
+        return
+      }
+      
+      try {
+        const response = await api.post('/responses', { candidate_id: cid, vacancy_id: selectedVacancy.id })
+        setResponseId(response.data.id)
+        // Store response_id with vacancy_id as key
+        try { 
+          localStorage.setItem(`response_${cid}_${selectedVacancy.id}`, response.data.id)
+          console.log('Saved new response to localStorage:', response.data.id)
+        } catch {}
+        setMsg('Спасибо! Отклик отправлен. Теперь вы можете пройти мини-собеседование.')
+      } catch (responseError: any) {
+        console.error('Response creation error:', responseError)
+        if (responseError.response?.status === 400 && responseError.response?.data?.detail?.includes('already exists')) {
+          setErr('Вы уже откликались на эту вакансию')
+        } else {
+          throw responseError // Re-throw to be caught by outer catch
+        }
+      }
     } catch (e: any) {
-      setErr('Не удалось отправить отклик. Попробуйте ещё раз.')
+      console.error('Apply error:', e)
+      if (e.response?.status === 500) {
+        setErr('Ошибка сервера. Попробуйте позже или обратитесь в поддержку.')
+      } else if (e.response?.status === 400) {
+        setErr('Некорректные данные. Проверьте заполненные поля.')
+      } else if (e.response?.data?.detail) {
+        setErr(`Ошибка: ${e.response.data.detail}`)
+      } else {
+        setErr('Не удалось отправить отклик. Проверьте подключение к интернету.')
+      }
     } finally {
       setBusy(false)
     }

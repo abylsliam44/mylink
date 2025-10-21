@@ -53,7 +53,7 @@ export default function ResumeEditor() {
       const id = r.data.id as string
       setCandidateId(id)
       try { localStorage.setItem('candidate_id', id) } catch {}
-      setMsg('PDF загружен, черновик профиля создан')
+      setMsg('PDF загружен через OCR! Теперь заполните профиль вручную для точной оценки.')
     } catch { setErr('Загрузка не удалась') } finally { setBusy(false) }
   }
 

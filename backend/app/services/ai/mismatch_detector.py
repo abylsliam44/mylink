@@ -1,40 +1,31 @@
 from typing import Any, Dict
 import base64
 from io import BytesIO
-from pypdf import PdfReader
-from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pdf2image import convert_from_bytes
 import pytesseract
 from app.services.ai.agents.mismatch_agent import MismatchDetectorAgent
 
 
 def _extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
-    """Best-effort text extraction: PyPDF first, then pdfminer fallback."""
+    """Extract text from PDF using OCR Tesseract only."""
     text = ""
     try:
-        reader = PdfReader(BytesIO(pdf_bytes))
-        pages = [p.extract_text() or "" for p in reader.pages]
-        text = "\n".join(pages).strip()
-    except Exception:
+        # Convert PDF pages to images and use OCR
+        images = convert_from_bytes(pdf_bytes, fmt='png', dpi=300)
+        ocr_text_parts = []
+        for img in images:
+            try:
+                # Use Tesseract OCR with Russian and English languages
+                ocr_text = pytesseract.image_to_string(img, lang='eng+rus')
+                if ocr_text.strip():
+                    ocr_text_parts.append(ocr_text.strip())
+            except Exception as e:
+                print(f"OCR error for page: {e}")
+                pass
+        text = "\n".join(ocr_text_parts).strip()
+    except Exception as e:
+        print(f"PDF to image conversion error: {e}")
         pass
-    if len(text) < 30:
-        try:
-            text = (pdfminer_extract_text(BytesIO(pdf_bytes)) or "").strip()
-        except Exception:
-            pass
-    # Final fallback: OCR each page as image via Tesseract
-    if len(text) < 30:
-        try:
-            images = convert_from_bytes(pdf_bytes, fmt='png')
-            ocr_text_parts = []
-            for img in images:
-                try:
-                    ocr_text_parts.append(pytesseract.image_to_string(img, lang='eng+rus'))
-                except Exception:
-                    pass
-            text = "\n".join(ocr_text_parts).strip()
-        except Exception:
-            pass
     return text
 
 

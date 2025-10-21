@@ -8,9 +8,9 @@ export default function EmployerDashboard() {
   const authHeaders = useMemo(() => token ? { Authorization: `Bearer ${token}` } : {}, [token])
 
   // Register/Login
-  const [companyName, setCompanyName] = useState('Test Corp')
-  const [email, setEmail] = useState('hr@test.com')
-  const [password, setPassword] = useState('test1234')
+  const [companyName, setCompanyName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [authMsg, setAuthMsg] = useState('')
 
   // Create vacancy

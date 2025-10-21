@@ -15,9 +15,9 @@ export default function Auth() {
   }, [])
 
   // Employer
-  const [company, setCompany] = useState('MyLink HR')
-  const [email, setEmail] = useState('hr@example.com')
-  const [password, setPassword] = useState('test1234')
+  const [company, setCompany] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [msg, setMsg] = useState('')
 
   const registerEmployer = async () => {
@@ -36,9 +36,9 @@ export default function Auth() {
   }
 
   // Candidate
-  const [fullName, setFullName] = useState('Иван Иванов')
-  const [cEmail, setCEmail] = useState('ivan@example.com')
-  const [city, setCity] = useState('Алматы')
+  const [fullName, setFullName] = useState('')
+  const [cEmail, setCEmail] = useState('')
+  const [city, setCity] = useState('')
   const [cPassword, setCPassword] = useState('')
   // резюме вводится позже на отдельной странице
 
