@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { api, wsUrl } from '../lib/api'
+import { useNotifications } from '../hooks/useNotifications'
+import NotificationContainer from '../components/NotificationContainer'
+import LoadingSpinner from '../components/LoadingSpinner'
+import AnimatedBackground from '../components/AnimatedBackground'
 
 type Vacancy = {
   id: string
@@ -13,6 +17,9 @@ type Vacancy = {
 }
 
 export default function Catalog() {
+  // Notifications
+  const { notifications, removeNotification, showSuccess, showError, showWarning, showInfo } = useNotifications()
+  
   // Data
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [selectedVacancyId, setSelectedVacancyId] = useState<string>('')
@@ -30,15 +37,12 @@ export default function Catalog() {
   const [city, setCity] = useState<string>(() => {
     try { return localStorage.getItem('candidate_city') || '' } catch { return '' }
   })
-  const [resumeSnippet, setResumeSnippet] = useState<string>(() => {
-    try { return localStorage.getItem('candidate_resume_snippet') || '' } catch { return '' }
-  })
+  const [resumeSnippet, setResumeSnippet] = useState<string>('')
+  const [hasUploadedResume, setHasUploadedResume] = useState<boolean>(false)
 
   // Upload & apply
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<string>('')
-  const [err, setErr] = useState<string>('')
   
   // Chat state
   const [responseId, setResponseId] = useState<string | null>(null)
@@ -69,6 +73,31 @@ export default function Catalog() {
       .then(r => setVacancies(r.data))
       .catch(() => setVacancies([]))
   }, [])
+
+  // Check if candidate has uploaded resume
+  useEffect(() => {
+    if (candidateId) {
+      // Check if candidate has resume data
+      api.get(`/candidates/${candidateId}/profile`)
+        .then(response => {
+          const profile = response.data
+          if (profile && profile.resume_text && profile.resume_text.trim()) {
+            setResumeSnippet(profile.resume_text.slice(0, 400))
+            setHasUploadedResume(true)
+          } else {
+            setHasUploadedResume(false)
+            setResumeSnippet('')
+          }
+        })
+        .catch(() => {
+          setHasUploadedResume(false)
+          setResumeSnippet('')
+        })
+    } else {
+      setHasUploadedResume(false)
+      setResumeSnippet('')
+    }
+  }, [candidateId])
 
   useEffect(() => {
     if (!selectedVacancyId && vacancies.length) setSelectedVacancyId(vacancies[0].id)
@@ -132,14 +161,18 @@ export default function Catalog() {
   // Upload PDF -> create candidate and store id
   const uploadResume = async () => {
     if (!pdfFile) {
-      setErr('Выберите PDF‑файл')
+      showError('Ошибка загрузки', 'Выберите PDF файл для загрузки')
       return
     }
     if (!fullName || !email) {
-      setErr('Заполните ФИО и E‑mail')
+      showError('Ошибка валидации', 'Заполните ФИО и Email')
       return
     }
-    setBusy(true); setErr(''); setMsg('')
+    if (!email.includes('@')) {
+      showError('Ошибка валидации', 'Укажите корректный email адрес')
+      return
+    }
+    setBusy(true)
     try {
       const form = new FormData()
       form.append('file', pdfFile)
@@ -157,11 +190,19 @@ export default function Catalog() {
         const snippet = (res.data.resume_text || '').slice(0, 400)
         localStorage.setItem('candidate_resume_snippet', snippet)
         setResumeSnippet(snippet)
+        setHasUploadedResume(true)
       } catch {}
-      setMsg('PDF загружен! Теперь заполните профиль для точной оценки.')
+      showSuccess('PDF загружен!', 'Резюме успешно обработано через OCR. Теперь заполните профиль для точной оценки.')
       setShowResumeEditor(true)
     } catch (e: any) {
-      setErr('Не удалось загрузить PDF. Попробуйте ещё раз.')
+      console.error('PDF upload error:', e)
+      if (e.response?.status === 400) {
+        showError('Ошибка загрузки', e.response.data?.detail || 'Некорректный формат файла')
+      } else if (e.response?.status === 413) {
+        showError('Файл слишком большой', 'Размер файла превышает допустимый лимит')
+      } else {
+        showError('Ошибка загрузки', 'Не удалось загрузить PDF. Проверьте подключение к интернету и попробуйте снова.')
+      }
     } finally {
       setBusy(false)
     }
@@ -304,25 +345,25 @@ export default function Catalog() {
   // Apply with existing candidateId, or create lightweight profile
   const apply = async () => {
     if (!selectedVacancy) {
-      setErr('Выберите вакансию для отклика')
+      showError('Ошибка отклика', 'Выберите вакансию для отклика')
       return
     }
     
     // Validate required fields
     if (!fullName.trim()) {
-      setErr('Укажите ваше ФИО')
+      showError('Ошибка валидации', 'Укажите ваше ФИО')
       return
     }
     if (!email.trim()) {
-      setErr('Укажите ваш email')
+      showError('Ошибка валидации', 'Укажите ваш email')
       return
     }
     if (!email.includes('@')) {
-      setErr('Укажите корректный email')
+      showError('Ошибка валидации', 'Укажите корректный email')
       return
     }
     
-    setBusy(true); setErr(''); setMsg('')
+    setBusy(true)
     try {
       let cid = candidateId
       if (!cid) {
@@ -338,7 +379,7 @@ export default function Catalog() {
           } catch {}
         } catch (e: any) {
           console.error('Candidate creation error:', e)
-          setErr('Не удалось создать профиль кандидата. Попробуйте ещё раз.')
+          showError('Ошибка создания профиля', 'Не удалось создать профиль кандидата. Попробуйте ещё раз.')
           setBusy(false)
           return
         }
@@ -351,7 +392,7 @@ export default function Catalog() {
         
         // Check if profile exists and has required data
         if (!profile || typeof profile !== 'object') {
-          setErr('Профиль не найден. Заполните профиль полностью.')
+          showError('Профиль не найден', 'Заполните профиль полностью')
           setShowResumeEditor(true)
           setBusy(false)
           return
@@ -359,16 +400,24 @@ export default function Catalog() {
         
         const hasSkills = profile.skills && Array.isArray(profile.skills) && profile.skills.length > 0 && profile.skills.some((s: string) => s && s.trim())
         const hasExperience = profile.experience && Array.isArray(profile.experience) && profile.experience.length > 0 && profile.experience.some((exp: any) => exp && exp.company && exp.title)
+        const hasResumeText = profile.resume_text && profile.resume_text.trim()
+        
+        if (!hasResumeText) {
+          showWarning('Требуется резюме', 'Для точной оценки загрузите PDF резюме')
+          setShowResumeEditor(true)
+          setBusy(false)
+          return
+        }
         
         if (!hasSkills || !hasExperience) {
-          setErr('Для точной оценки заполните профиль: навыки и опыт работы')
+          showWarning('Неполный профиль', 'Для точной оценки заполните профиль: навыки и опыт работы')
           setShowResumeEditor(true)
           setBusy(false)
           return
         }
       } catch (e: any) {
         console.error('Profile check error:', e)
-        setErr('Ошибка проверки профиля. Заполните профиль полностью.')
+        showError('Ошибка проверки профиля', 'Заполните профиль полностью')
         setShowResumeEditor(true)
         setBusy(false)
         return
@@ -382,11 +431,11 @@ export default function Catalog() {
           localStorage.setItem(`response_${cid}_${selectedVacancy.id}`, response.data.id)
           console.log('Saved new response to localStorage:', response.data.id)
         } catch {}
-        setMsg('Спасибо! Отклик отправлен. Теперь вы можете пройти мини-собеседование.')
+        showSuccess('Отклик отправлен!', 'Спасибо! Теперь вы можете пройти мини-собеседование.')
       } catch (responseError: any) {
         console.error('Response creation error:', responseError)
         if (responseError.response?.status === 400 && responseError.response?.data?.detail?.includes('already exists')) {
-          setErr('Вы уже откликались на эту вакансию')
+          showWarning('Дубликат отклика', 'Вы уже откликались на эту вакансию')
         } else {
           throw responseError // Re-throw to be caught by outer catch
         }
@@ -394,13 +443,13 @@ export default function Catalog() {
     } catch (e: any) {
       console.error('Apply error:', e)
       if (e.response?.status === 500) {
-        setErr('Ошибка сервера. Попробуйте позже или обратитесь в поддержку.')
+        showError('Ошибка сервера', 'Попробуйте позже или обратитесь в поддержку')
       } else if (e.response?.status === 400) {
-        setErr('Некорректные данные. Проверьте заполненные поля.')
+        showError('Некорректные данные', 'Проверьте заполненные поля')
       } else if (e.response?.data?.detail) {
-        setErr(`Ошибка: ${e.response.data.detail}`)
+        showError('Ошибка', e.response.data.detail)
       } else {
-        setErr('Не удалось отправить отклик. Проверьте подключение к интернету.')
+        showError('Ошибка подключения', 'Не удалось отправить отклик. Проверьте подключение к интернету')
       }
     } finally {
       setBusy(false)
@@ -408,7 +457,16 @@ export default function Catalog() {
   }
 
   return (
-    <div>
+    <div className="relative min-h-screen">
+      {/* Animated Background */}
+      <AnimatedBackground />
+      
+      {/* Notifications */}
+      <NotificationContainer 
+        notifications={notifications} 
+        onRemove={removeNotification} 
+      />
+      
       {/* Filters */}
       {/* Filter bar (static, not sticky) */}
       <section className="bg-white border-b border-[#E6E8EB]">
@@ -480,16 +538,34 @@ export default function Catalog() {
                     <input className="border rounded px-3 py-2" type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
                   </div>
                   <div className="mt-1 flex gap-2">
-                    <button className="btn-primary" onClick={uploadResume} disabled={busy}>Загрузить PDF</button>
-                    <button className="btn-outline" onClick={() => { setPdfFile(null); setResumeSnippet(''); setCandidateId(null); try { localStorage.removeItem('candidate_id'); localStorage.removeItem('candidate_resume_snippet') } catch {} }}>Очистить</button>
+                    <button className="btn-primary flex items-center gap-2" onClick={uploadResume} disabled={busy}>
+                      {busy ? <LoadingSpinner size="sm" /> : null}
+                      {busy ? 'Загрузка...' : 'Загрузить PDF'}
+                    </button>
+                    <button className="btn-outline" onClick={() => { 
+                      setPdfFile(null); 
+                      setResumeSnippet(''); 
+                      setHasUploadedResume(false);
+                      setCandidateId(null); 
+                      try { 
+                        localStorage.removeItem('candidate_id'); 
+                        localStorage.removeItem('candidate_resume_snippet');
+                        localStorage.removeItem('candidate_name');
+                        localStorage.removeItem('candidate_email');
+                        localStorage.removeItem('candidate_city');
+                      } catch {} 
+                    }}>Очистить</button>
                     <button className="btn-outline" onClick={() => setShowResumeEditor(false)}>Скрыть</button>
                   </div>
                 </div>
               )}
-              {candidateId && (
+              {candidateId && hasUploadedResume && (
                 <div className="text-[12px] text-grayx-600">Резюме загружено. ID: {candidateId}</div>
               )}
-              {resumeSnippet && (
+              {candidateId && !hasUploadedResume && (
+                <div className="text-[12px] text-orange-600">Профиль создан, но резюме не загружено. Загрузите PDF для полного анализа.</div>
+              )}
+              {resumeSnippet && hasUploadedResume && (
                 <div className="mt-3 text-[12px] text-grayx-600 max-h-40 overflow-auto border rounded p-2 bg-grayx-50">{resumeSnippet}</div>
               )}
             </div>
@@ -513,8 +589,9 @@ export default function Catalog() {
               )}
               
               <div className="flex gap-2 flex-wrap">
-                <button className="btn-primary" onClick={apply} disabled={busy || !selectedVacancy || !!responseId}>
-                  {responseId ? 'Уже откликнулись' : 'Откликнуться'}
+                <button className="btn-primary flex items-center gap-2" onClick={apply} disabled={busy || !selectedVacancy || !!responseId}>
+                  {busy ? <LoadingSpinner size="sm" /> : null}
+                  {responseId ? 'Уже откликнулись' : (busy ? 'Отправка...' : 'Откликнуться')}
                 </button>
                 <button className="btn-outline" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>К списку</button>
                 

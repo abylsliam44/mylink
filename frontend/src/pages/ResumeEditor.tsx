@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
+import { useNotifications } from '../hooks/useNotifications'
+import NotificationContainer from '../components/NotificationContainer'
+import LoadingSpinner from '../components/LoadingSpinner'
+import AnimatedBackground from '../components/AnimatedBackground'
 
 export default function ResumeEditor() {
+  // Notifications
+  const { notifications, removeNotification, showSuccess, showError, showWarning, showInfo } = useNotifications()
+  
   const [candidateId, setCandidateId] = useState<string | null>(() => {
     try { return localStorage.getItem('candidate_id') } catch { return null }
   })
@@ -14,8 +21,6 @@ export default function ResumeEditor() {
     certificates: [{ name: '', issuer: '', year: '' }],
   })
   const [pdfFile, setPdfFile] = useState<File | null>(null)
-  const [msg, setMsg] = useState('')
-  const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -31,18 +36,32 @@ export default function ResumeEditor() {
   }, [candidateId])
 
   const save = async () => {
-    if (!candidateId) { setErr('Сначала загрузите резюме PDF или откликнитесь в каталоге'); return }
-    setBusy(true); setMsg(''); setErr('')
+    if (!candidateId) { 
+      showError('Ошибка сохранения', 'Сначала загрузите резюме PDF или откликнитесь в каталоге')
+      return 
+    }
+    setBusy(true)
     try {
       await api.put(`/candidates/${candidateId}/profile`, profile)
-      setMsg('Профиль сохранён')
-    } catch { setErr('Не удалось сохранить профиль') } finally { setBusy(false) }
+      showSuccess('Профиль сохранён', 'Ваш профиль успешно обновлён')
+    } catch (e: any) {
+      console.error('Save profile error:', e)
+      showError('Ошибка сохранения', 'Не удалось сохранить профиль. Попробуйте снова.')
+    } finally { 
+      setBusy(false) 
+    }
   }
 
   const uploadPdf = async () => {
-    if (!pdfFile) { setErr('Выберите PDF'); return }
-    if (!profile.basics.full_name || !profile.basics.email) { setErr('Заполните ФИО и Email'); return }
-    setBusy(true); setMsg(''); setErr('')
+    if (!pdfFile) { 
+      showError('Ошибка загрузки', 'Выберите PDF файл')
+      return 
+    }
+    if (!profile.basics.full_name || !profile.basics.email) { 
+      showError('Ошибка валидации', 'Заполните ФИО и Email')
+      return 
+    }
+    setBusy(true)
     try {
       const form = new FormData()
       form.append('file', pdfFile)
@@ -53,13 +72,34 @@ export default function ResumeEditor() {
       const id = r.data.id as string
       setCandidateId(id)
       try { localStorage.setItem('candidate_id', id) } catch {}
-      setMsg('PDF загружен через OCR! Теперь заполните профиль вручную для точной оценки.')
-    } catch { setErr('Загрузка не удалась') } finally { setBusy(false) }
+      showSuccess('PDF загружен!', 'Резюме успешно обработано через OCR. Теперь заполните профиль вручную для точной оценки.')
+    } catch (e: any) {
+      console.error('PDF upload error:', e)
+      if (e.response?.status === 400) {
+        showError('Ошибка загрузки', e.response.data?.detail || 'Некорректный формат файла')
+      } else if (e.response?.status === 413) {
+        showError('Файл слишком большой', 'Размер файла превышает допустимый лимит')
+      } else {
+        showError('Ошибка загрузки', 'Загрузка не удалась. Проверьте подключение к интернету.')
+      }
+    } finally { 
+      setBusy(false) 
+    }
   }
 
   return (
-    <div className="container py-6 space-y-4">
-      <h1 className="text-[28px] leading-[36px] font-semibold">Страница резюме</h1>
+    <div className="relative min-h-screen">
+      {/* Animated Background */}
+      <AnimatedBackground />
+      
+      {/* Notifications */}
+      <NotificationContainer 
+        notifications={notifications} 
+        onRemove={removeNotification} 
+      />
+      
+      <div className="container py-6 space-y-4 relative z-10">
+        <h1 className="text-[28px] leading-[36px] font-semibold">Страница резюме</h1>
 
       {/* Basics */}
       <section className="card p-4 space-y-2">
@@ -72,7 +112,10 @@ export default function ResumeEditor() {
         <textarea className="border rounded px-3 py-2" placeholder="Кратко о себе" value={profile.summary} onChange={e => setProfile({ ...profile, summary: e.target.value })} />
         <div className="flex items-center gap-2">
           <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
-          <button className="btn-outline" onClick={uploadPdf} disabled={busy}>Загрузить PDF</button>
+          <button className="btn-outline flex items-center gap-2" onClick={uploadPdf} disabled={busy}>
+            {busy ? <LoadingSpinner size="sm" /> : null}
+            {busy ? 'Загрузка...' : 'Загрузить PDF'}
+          </button>
         </div>
       </section>
 
@@ -132,10 +175,12 @@ export default function ResumeEditor() {
       </section>
 
       <div className="flex gap-2">
-        <button className="btn-primary" onClick={save} disabled={busy}>Сохранить</button>
+        <button className="btn-primary flex items-center gap-2" onClick={save} disabled={busy}>
+          {busy ? <LoadingSpinner size="sm" /> : null}
+          {busy ? 'Сохранение...' : 'Сохранить'}
+        </button>
       </div>
-      {msg && <div className="text-sm text-success-600">{msg}</div>}
-      {err && <div className="text-sm text-danger-600">{err}</div>}
+      </div>
     </div>
   )
 }
