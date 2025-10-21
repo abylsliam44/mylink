@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import logging
 
 from app.config import settings
-from app.api import auth, employers, vacancies, candidates, responses, chat
+from app.api import auth, employers, vacancies, candidates, responses, chat, admin
 from app.api import ai as ai_router
 from app.db.redis import close_redis
 from app.services.ai.registry_setup import register_all_agents
@@ -37,6 +37,14 @@ async def lifespan(app: FastAPI):
         logger.info("Database tables ensured (create_all)")
     except Exception as e:
         logger.exception("Failed ensuring DB schema: %s", e)
+    
+    # Auto-fix database schema for production
+    try:
+        from app.scripts.auto_fix_on_startup import auto_fix_schema
+        await auto_fix_schema()
+    except Exception as e:
+        logger.warning("Auto-fix schema failed (non-critical): %s", e)
+    
     # Register AI agents
     register_all_agents()
     logger.info("AI agents registered")
@@ -80,6 +88,7 @@ app.include_router(candidates.router)
 app.include_router(responses.router)
 app.include_router(chat.router)
 app.include_router(ai_router.router)
+app.include_router(admin.router, prefix="/admin")
 
 
 @app.get("/")

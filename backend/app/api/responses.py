@@ -159,8 +159,73 @@ async def list_responses(
     if vacancy_id:
         query = query.where(CandidateResponse.vacancy_id == vacancy_id)
     
-    result = await db.execute(query.order_by(CandidateResponse.created_at.desc()))
-    rows = result.all()
+    # Temporarily exclude AI columns that might not exist in production
+    try:
+        result = await db.execute(query.order_by(CandidateResponse.created_at.desc()))
+        rows = result.all()
+    except Exception as e:
+        if "mismatch_analysis" in str(e) or "dialog_findings" in str(e) or "language_preference" in str(e):
+            print(f"⚠️  AI columns missing, using fallback query: {e}")
+            # Fallback query without AI columns
+            fallback_query = (
+                select(
+                    CandidateResponse.id,
+                    CandidateResponse.vacancy_id,
+                    CandidateResponse.candidate_id,
+                    CandidateResponse.status,
+                    CandidateResponse.relevance_score,
+                    CandidateResponse.rejection_reasons,
+                    CandidateResponse.created_at,
+                    Candidate.id.label("candidate_id"),
+                    Candidate.full_name,
+                    Candidate.email,
+                    Candidate.phone,
+                    Candidate.city,
+                    Candidate.resume_text,
+                    Candidate.created_at.label("candidate_created_at")
+                )
+                .join(Vacancy, CandidateResponse.vacancy_id == Vacancy.id)
+                .join(Candidate, CandidateResponse.candidate_id == Candidate.id)
+                .where(Vacancy.employer_id == current_employer.id)
+            )
+            
+            if vacancy_id:
+                fallback_query = fallback_query.where(CandidateResponse.vacancy_id == vacancy_id)
+            
+            result = await db.execute(fallback_query.order_by(CandidateResponse.created_at.desc()))
+            rows = result.all()
+            
+            # Convert to the expected format
+            response_list = []
+            for row in rows:
+                # Create a mock response object
+                mock_response = type('MockResponse', (), {
+                    'id': row.id,
+                    'vacancy_id': row.vacancy_id,
+                    'candidate_id': row.candidate_id,
+                    'status': row.status,
+                    'relevance_score': row.relevance_score,
+                    'rejection_reasons': row.rejection_reasons,
+                    'created_at': row.created_at,
+                    'mismatch_analysis': None,
+                    'dialog_findings': None,
+                    'language_preference': 'ru'
+                })()
+                
+                # Create a mock candidate object
+                mock_candidate = type('MockCandidate', (), {
+                    'id': row.candidate_id,
+                    'full_name': row.full_name,
+                    'email': row.email,
+                    'phone': row.phone,
+                    'city': row.city,
+                    'resume_text': row.resume_text,
+                    'created_at': row.candidate_created_at
+                })()
+                
+                rows = [(mock_response, mock_candidate)]
+        else:
+            raise e
     
     # Build response list with candidate info
     response_list = []
