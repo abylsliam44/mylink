@@ -297,7 +297,7 @@ export default function CandidateWidget() {
     reconnectTimer.current = window.setTimeout(() => connectWs(), delay)
   }
 
-  const handlePreChatStart = (language: string, consent: boolean) => {
+  const handlePreChatStart = (_language: string, _consent: boolean) => {
     setShowPreChat(false)
     setShowChatModal(true)
     // Update response with language preference (if needed)

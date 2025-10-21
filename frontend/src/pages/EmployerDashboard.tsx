@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api'
 import InterviewSummary from '../components/InterviewSummary'
 import ChatHistory from '../components/ChatHistory'
+import PageTransition from '../components/PageTransition'
 
 export default function EmployerDashboard() {
   const [token, setToken] = useState<string | null>(null)
@@ -144,7 +145,8 @@ export default function EmployerDashboard() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 space-y-8">
+    <PageTransition>
+      <div className="mx-auto max-w-6xl px-4 py-6 space-y-8">
       {/* DEBUG BANNER - REMOVE AFTER TESTING */}
       <div className="bg-red-600 text-white p-4 rounded-lg text-center font-bold text-xl">
         🔴 DEBUG MODE ACTIVE - VERSION 2.0 - BUTTONS SHOULD BE VISIBLE 🔴
@@ -383,6 +385,7 @@ export default function EmployerDashboard() {
           <pre className="text-xs mt-3 bg-gray-50 p-2 rounded border overflow-auto max-h-96">{JSON.stringify(mismatchResult, null, 2)}</pre>
         )}
       </section>
-    </div>
+      </div>
+    </PageTransition>
   )
 }

@@ -12,6 +12,7 @@ export default function AnimatedBackground() {
 
     // Set canvas size
     const resizeCanvas = () => {
+      if (!canvas) return
       canvas.width = window.innerWidth
       canvas.height = window.innerHeight
     }
@@ -20,15 +21,16 @@ export default function AnimatedBackground() {
 
     // Particle system
     class Particle {
-      x: number
-      y: number
-      vx: number
-      vy: number
-      size: number
-      opacity: number
-      color: string
+      x: number = 0
+      y: number = 0
+      vx: number = 0
+      vy: number = 0
+      size: number = 1
+      opacity: number = 0.5
+      color: string = '#3B82F6'
 
       constructor() {
+        if (!canvas) return
         this.x = Math.random() * canvas.width
         this.y = Math.random() * canvas.height
         this.vx = (Math.random() - 0.5) * 0.5
@@ -43,6 +45,7 @@ export default function AnimatedBackground() {
         this.y += this.vy
 
         // Wrap around edges
+        if (!canvas) return
         if (this.x < 0) this.x = canvas.width
         if (this.x > canvas.width) this.x = 0
         if (this.y < 0) this.y = canvas.height
@@ -50,6 +53,7 @@ export default function AnimatedBackground() {
       }
 
       draw() {
+        if (!ctx) return
         ctx.save()
         ctx.globalAlpha = this.opacity
         ctx.fillStyle = this.color
@@ -75,6 +79,7 @@ export default function AnimatedBackground() {
       }
 
       draw() {
+        if (!ctx) return
         if (this.distance < 100) {
           ctx.save()
           ctx.globalAlpha = (100 - this.distance) / 100 * 0.2
@@ -100,6 +105,7 @@ export default function AnimatedBackground() {
     // Animation loop
     let animationId: number
     const animate = () => {
+      if (!ctx || !canvas) return
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
       // Update and draw particles

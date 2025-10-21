@@ -5,7 +5,7 @@ const DEFAULT_BACKEND = 'https://mylink-trn6.onrender.com'
 
 // In production, hardcode the only allowed frontend origin and use same-origin '/api'.
 const isProd = import.meta.env.PROD === true
-const PROD_FRONTEND = 'https://mylink-rouge.vercel.app'
+// const PROD_FRONTEND = 'https://mylink-rouge.vercel.app'
 const HTTP_BASE = isProd ? '/api' : ((import.meta.env.VITE_API_URL as string | undefined) || '/api')
 
 // Для WebSocket и построения wsUrl нужен полный origin бэка (может быть кросс-доменным)

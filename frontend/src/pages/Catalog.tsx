@@ -4,6 +4,7 @@ import { useNotifications } from '../hooks/useNotifications'
 import NotificationContainer from '../components/NotificationContainer'
 import LoadingSpinner from '../components/LoadingSpinner'
 import AnimatedBackground from '../components/AnimatedBackground'
+import PageTransition from '../components/PageTransition'
 
 type Vacancy = {
   id: string
@@ -18,7 +19,7 @@ type Vacancy = {
 
 export default function Catalog() {
   // Notifications
-  const { notifications, removeNotification, showSuccess, showError, showWarning, showInfo } = useNotifications()
+  const { notifications, removeNotification, showSuccess, showError, showWarning } = useNotifications()
   
   // Data
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
@@ -209,7 +210,7 @@ export default function Catalog() {
   }
 
   // Chat functions
-  const handlePreChatStart = (language: string, consent: boolean) => {
+  const handlePreChatStart = (_language: string, _consent: boolean) => {
     setShowPreChat(false)
     setShowChatModal(true)
     connectWs()
@@ -467,7 +468,8 @@ export default function Catalog() {
         onRemove={removeNotification} 
       />
       
-      {/* Filters */}
+      <PageTransition>
+        {/* Filters */}
       {/* Filter bar (static, not sticky) */}
       <section className="bg-white border-b border-[#E6E8EB]">
         <div className="container py-4">
@@ -611,8 +613,6 @@ export default function Catalog() {
                   </button>
                 )}
               </div>
-              {msg && <div className="text-sm text-success-600 mt-2">{msg}</div>}
-              {err && <div className="text-sm text-danger-600 mt-2">{err}</div>}
             </div>
           </div>
         </div>
@@ -792,6 +792,7 @@ export default function Catalog() {
           </div>
         </div>
       )}
+      </PageTransition>
     </div>
   )
 }

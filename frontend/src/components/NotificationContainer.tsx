@@ -1,5 +1,12 @@
 import Notification from './Notification'
-import { Notification as NotificationType } from '../hooks/useNotifications'
+
+interface NotificationType {
+  id: string
+  type: 'success' | 'error' | 'warning' | 'info'
+  title: string
+  message: string
+  duration?: number
+}
 
 interface NotificationContainerProps {
   notifications: NotificationType[]

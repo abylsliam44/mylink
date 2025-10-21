@@ -4,10 +4,11 @@ import { useNotifications } from '../hooks/useNotifications'
 import NotificationContainer from '../components/NotificationContainer'
 import LoadingSpinner from '../components/LoadingSpinner'
 import AnimatedBackground from '../components/AnimatedBackground'
+import PageTransition from '../components/PageTransition'
 
 export default function ResumeEditor() {
   // Notifications
-  const { notifications, removeNotification, showSuccess, showError, showWarning, showInfo } = useNotifications()
+  const { notifications, removeNotification, showSuccess, showError } = useNotifications()
   
   const [candidateId, setCandidateId] = useState<string | null>(() => {
     try { return localStorage.getItem('candidate_id') } catch { return null }
@@ -28,11 +29,10 @@ export default function ResumeEditor() {
       if (!candidateId) return
       try {
         const r = await api.get(`/candidates/${candidateId}/profile`)
-        setProfile({ ...profile, ...r.data })
+        setProfile(r.data)
       } catch {}
     }
     load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateId])
 
   const save = async () => {
@@ -98,89 +98,87 @@ export default function ResumeEditor() {
         onRemove={removeNotification} 
       />
       
-      <div className="container py-6 space-y-4 relative z-10">
-        <h1 className="text-[28px] leading-[36px] font-semibold">Страница резюме</h1>
+      <PageTransition>
+        <div className="container py-6 space-y-4 relative z-10">
+          <h1 className="text-[28px] leading-[36px] font-semibold">Страница резюме</h1>
 
-      {/* Basics */}
-      <section className="card p-4 space-y-2">
-        <h2 className="text-lg font-semibold">Основное</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <input className="border rounded px-3 py-2" placeholder="ФИО" value={profile.basics.full_name} onChange={e => setProfile({ ...profile, basics: { ...profile.basics, full_name: e.target.value } })} />
-          <input className="border rounded px-3 py-2" placeholder="Email" value={profile.basics.email} onChange={e => setProfile({ ...profile, basics: { ...profile.basics, email: e.target.value } })} />
-          <input className="border rounded px-3 py-2" placeholder="Город" value={profile.basics.city} onChange={e => setProfile({ ...profile, basics: { ...profile.basics, city: e.target.value } })} />
-        </div>
-        <textarea className="border rounded px-3 py-2" placeholder="Кратко о себе" value={profile.summary} onChange={e => setProfile({ ...profile, summary: e.target.value })} />
-        <div className="flex items-center gap-2">
-          <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
-          <button className="btn-outline flex items-center gap-2" onClick={uploadPdf} disabled={busy}>
-            {busy ? <LoadingSpinner size="sm" /> : null}
-            {busy ? 'Загрузка...' : 'Загрузить PDF'}
-          </button>
-        </div>
-      </section>
+          {/* Basics */}
+          <section className="card p-4 space-y-2">
+            <h2 className="text-lg font-semibold">Основное</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <input className="border rounded px-3 py-2" placeholder="ФИО" value={profile.basics.full_name} onChange={e => setProfile({ ...profile, basics: { ...profile.basics, full_name: e.target.value } })} />
+              <input className="border rounded px-3 py-2" placeholder="Email" value={profile.basics.email} onChange={e => setProfile({ ...profile, basics: { ...profile.basics, email: e.target.value } })} />
+              <input className="border rounded px-3 py-2" placeholder="Город" value={profile.basics.city} onChange={e => setProfile({ ...profile, basics: { ...profile.basics, city: e.target.value } })} />
+            </div>
+            <textarea className="border rounded px-3 py-2" placeholder="Кратко о себе" value={profile.summary} onChange={e => setProfile({ ...profile, summary: e.target.value })} />
+            <div className="flex items-center gap-2">
+              <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
+              <button className="btn-outline flex items-center gap-2" onClick={uploadPdf} disabled={busy}>
+                {busy ? <LoadingSpinner size="sm" /> : null}
+                {busy ? 'Загрузка...' : 'Загрузить PDF'}
+              </button>
+            </div>
+          </section>
 
-      {/* Skills */}
-      <section className="card p-4 space-y-2">
-        <h2 className="text-lg font-semibold">Навыки</h2>
-        <div className="flex flex-wrap gap-2">
-          {profile.skills.map((s: string, i: number) => (
-            <input key={i} className="border rounded px-3 py-2" value={s} onChange={e => {
-              const next = [...profile.skills]; next[i] = e.target.value; setProfile({ ...profile, skills: next })
-            }} />
-          ))}
-          <button className="btn-outline" onClick={() => setProfile({ ...profile, skills: [...profile.skills, ''] })}>Добавить</button>
-        </div>
-      </section>
+          {/* Skills */}
+          <section className="card p-4 space-y-2">
+            <h2 className="text-lg font-semibold">Навыки</h2>
+            {profile.skills.map((skill: string, i: number) => (
+              <input key={i} className="border rounded px-3 py-2" placeholder="Навык" value={skill} onChange={e => setProfile({ ...profile, skills: profile.skills.map((s: string, j: number) => j === i ? e.target.value : s) })} />
+            ))}
+            <button className="btn-outline" onClick={() => setProfile({ ...profile, skills: [...profile.skills, ''] })}>Добавить навык</button>
+          </section>
 
-      {/* Experience */}
-      <section className="card p-4 space-y-2">
-        <h2 className="text-lg font-semibold">Опыт работы</h2>
-        {profile.experience.map((e: any, i: number) => (
-          <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-2">
-            <input className="border rounded px-3 py-2" placeholder="Компания" value={e.company} onChange={ev => { const next = [...profile.experience]; next[i].company = ev.target.value; setProfile({ ...profile, experience: next }) }} />
-            <input className="border rounded px-3 py-2" placeholder="Должность" value={e.title} onChange={ev => { const next = [...profile.experience]; next[i].title = ev.target.value; setProfile({ ...profile, experience: next }) }} />
-            <input className="border rounded px-3 py-2" placeholder="Начало YYYY-MM" value={e.start} onChange={ev => { const next = [...profile.experience]; next[i].start = ev.target.value; setProfile({ ...profile, experience: next }) }} />
-            <input className="border rounded px-3 py-2" placeholder="Конец YYYY-MM / по наст." value={e.end} onChange={ev => { const next = [...profile.experience]; next[i].end = ev.target.value; setProfile({ ...profile, experience: next }) }} />
-            <textarea className="border rounded px-3 py-2 md:col-span-4" placeholder="Описание" value={e.description} onChange={ev => { const next = [...profile.experience]; next[i].description = ev.target.value; setProfile({ ...profile, experience: next }) }} />
+          {/* Experience */}
+          <section className="card p-4 space-y-2">
+            <h2 className="text-lg font-semibold">Опыт работы</h2>
+            {profile.experience.map((exp: any, i: number) => (
+              <div key={i} className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <input className="border rounded px-3 py-2" placeholder="Компания" value={exp.company} onChange={e => setProfile({ ...profile, experience: profile.experience.map((ex: any, j: number) => j === i ? { ...ex, company: e.target.value } : ex) })} />
+                <input className="border rounded px-3 py-2" placeholder="Должность" value={exp.title} onChange={e => setProfile({ ...profile, experience: profile.experience.map((ex: any, j: number) => j === i ? { ...ex, title: e.target.value } : ex) })} />
+                <input className="border rounded px-3 py-2" placeholder="Начало" value={exp.start} onChange={e => setProfile({ ...profile, experience: profile.experience.map((ex: any, j: number) => j === i ? { ...ex, start: e.target.value } : ex) })} />
+                <input className="border rounded px-3 py-2" placeholder="Конец" value={exp.end} onChange={e => setProfile({ ...profile, experience: profile.experience.map((ex: any, j: number) => j === i ? { ...ex, end: e.target.value } : ex) })} />
+                <textarea className="border rounded px-3 py-2 md:col-span-2" placeholder="Описание" value={exp.description} onChange={e => setProfile({ ...profile, experience: profile.experience.map((ex: any, j: number) => j === i ? { ...ex, description: e.target.value } : ex) })} />
+              </div>
+            ))}
+            <button className="btn-outline" onClick={() => setProfile({ ...profile, experience: [...profile.experience, { company: '', title: '', start: '', end: '', description: '' }] })}>Добавить опыт</button>
+          </section>
+
+          {/* Education */}
+          <section className="card p-4 space-y-2">
+            <h2 className="text-lg font-semibold">Образование</h2>
+            {profile.education.map((edu: any, i: number) => (
+              <div key={i} className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <input className="border rounded px-3 py-2" placeholder="Учебное заведение" value={edu.place} onChange={e => setProfile({ ...profile, education: profile.education.map((ed: any, j: number) => j === i ? { ...ed, place: e.target.value } : ed) })} />
+                <input className="border rounded px-3 py-2" placeholder="Степень" value={edu.degree} onChange={e => setProfile({ ...profile, education: profile.education.map((ed: any, j: number) => j === i ? { ...ed, degree: e.target.value } : ed) })} />
+                <input className="border rounded px-3 py-2" placeholder="Начало" value={edu.start} onChange={e => setProfile({ ...profile, education: profile.education.map((ed: any, j: number) => j === i ? { ...ed, start: e.target.value } : ed) })} />
+                <input className="border rounded px-3 py-2" placeholder="Конец" value={edu.end} onChange={e => setProfile({ ...profile, education: profile.education.map((ed: any, j: number) => j === i ? { ...ed, end: e.target.value } : ed) })} />
+              </div>
+            ))}
+            <button className="btn-outline" onClick={() => setProfile({ ...profile, education: [...profile.education, { place: '', degree: '', start: '', end: '' }] })}>Добавить образование</button>
+          </section>
+
+          {/* Certificates */}
+          <section className="card p-4 space-y-2">
+            <h2 className="text-lg font-semibold">Сертификаты</h2>
+            {profile.certificates.map((cert: any, i: number) => (
+              <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <input className="border rounded px-3 py-2" placeholder="Название" value={cert.name} onChange={e => setProfile({ ...profile, certificates: profile.certificates.map((c: any, j: number) => j === i ? { ...c, name: e.target.value } : c) })} />
+                <input className="border rounded px-3 py-2" placeholder="Организация" value={cert.issuer} onChange={e => setProfile({ ...profile, certificates: profile.certificates.map((c: any, j: number) => j === i ? { ...c, issuer: e.target.value } : c) })} />
+                <input className="border rounded px-3 py-2" placeholder="Год" value={cert.year} onChange={e => setProfile({ ...profile, certificates: profile.certificates.map((c: any, j: number) => j === i ? { ...c, year: e.target.value } : c) })} />
+              </div>
+            ))}
+            <button className="btn-outline" onClick={() => setProfile({ ...profile, certificates: [...profile.certificates, { name: '', issuer: '', year: '' }] })}>Добавить сертификат</button>
+          </section>
+
+          <div className="flex gap-2">
+            <button className="btn-primary flex items-center gap-2" onClick={save} disabled={busy}>
+              {busy ? <LoadingSpinner size="sm" /> : null}
+              {busy ? 'Сохранение...' : 'Сохранить'}
+            </button>
           </div>
-        ))}
-        <button className="btn-outline" onClick={() => setProfile({ ...profile, experience: [...profile.experience, { company: '', title: '', start: '', end: '', description: '' }] })}>Добавить опыт</button>
-      </section>
-
-      {/* Education */}
-      <section className="card p-4 space-y-2">
-        <h2 className="text-lg font-semibold">Образование</h2>
-        {profile.education.map((e: any, i: number) => (
-          <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-2">
-            <input className="border rounded px-3 py-2" placeholder="Учебное заведение" value={e.place} onChange={ev => { const next = [...profile.education]; next[i].place = ev.target.value; setProfile({ ...profile, education: next }) }} />
-            <input className="border rounded px-3 py-2" placeholder="Степень/направление" value={e.degree} onChange={ev => { const next = [...profile.education]; next[i].degree = ev.target.value; setProfile({ ...profile, education: next }) }} />
-            <input className="border rounded px-3 py-2" placeholder="Начало YYYY-MM" value={e.start} onChange={ev => { const next = [...profile.education]; next[i].start = ev.target.value; setProfile({ ...profile, education: next }) }} />
-            <input className="border rounded px-3 py-2" placeholder="Конец YYYY-MM/ожидается" value={e.end} onChange={ev => { const next = [...profile.education]; next[i].end = ev.target.value; setProfile({ ...profile, education: next }) }} />
-          </div>
-        ))}
-        <button className="btn-outline" onClick={() => setProfile({ ...profile, education: [...profile.education, { place: '', degree: '', start: '', end: '' }] })}>Добавить образование</button>
-      </section>
-
-      {/* Certificates */}
-      <section className="card p-4 space-y-2">
-        <h2 className="text-lg font-semibold">Сертификаты</h2>
-        {profile.certificates.map((c: any, i: number) => (
-          <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-2">
-            <input className="border rounded px-3 py-2" placeholder="Название" value={c.name} onChange={ev => { const next = [...profile.certificates]; next[i].name = ev.target.value; setProfile({ ...profile, certificates: next }) }} />
-            <input className="border rounded px-3 py-2" placeholder="Выдавшая организация" value={c.issuer} onChange={ev => { const next = [...profile.certificates]; next[i].issuer = ev.target.value; setProfile({ ...profile, certificates: next }) }} />
-            <input className="border rounded px-3 py-2" placeholder="Год" value={c.year} onChange={ev => { const next = [...profile.certificates]; next[i].year = ev.target.value; setProfile({ ...profile, certificates: next }) }} />
-          </div>
-        ))}
-        <button className="btn-outline" onClick={() => setProfile({ ...profile, certificates: [...profile.certificates, { name: '', issuer: '', year: '' }] })}>Добавить сертификат</button>
-      </section>
-
-      <div className="flex gap-2">
-        <button className="btn-primary flex items-center gap-2" onClick={save} disabled={busy}>
-          {busy ? <LoadingSpinner size="sm" /> : null}
-          {busy ? 'Сохранение...' : 'Сохранить'}
-        </button>
-      </div>
-      </div>
+        </div>
+      </PageTransition>
     </div>
   )
 }
