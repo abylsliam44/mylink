@@ -5,6 +5,11 @@ import NotificationContainer from '../components/NotificationContainer'
 import LoadingSpinner from '../components/LoadingSpinner'
 import AnimatedBackground from '../components/AnimatedBackground'
 import PageTransition from '../components/PageTransition'
+import PDFUploadZone from '../components/PDFUploadZone'
+import SkillsInput from '../components/SkillsInput'
+import ExperienceInput from '../components/ExperienceInput'
+import EducationInput from '../components/EducationInput'
+import CertificatesInput from '../components/CertificatesInput'
 
 export default function ResumeEditor() {
   // Notifications
@@ -99,82 +104,111 @@ export default function ResumeEditor() {
       />
       
       <PageTransition>
-        <div className="container py-6 space-y-4 relative z-10">
-          <h1 className="text-[28px] leading-[36px] font-semibold">Страница резюме</h1>
+        <div className="container py-6 space-y-8 relative z-10">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Моё резюме</h1>
+            <p className="text-gray-600">Заполните информацию о себе для точного анализа</p>
+          </div>
 
-          {/* Basics */}
-          <section className="card p-4 space-y-2">
-            <h2 className="text-lg font-semibold">Основное</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              <input className="border rounded px-3 py-2" placeholder="ФИО" value={profile.basics.full_name} onChange={e => setProfile({ ...profile, basics: { ...profile.basics, full_name: e.target.value } })} />
-              <input className="border rounded px-3 py-2" placeholder="Email" value={profile.basics.email} onChange={e => setProfile({ ...profile, basics: { ...profile.basics, email: e.target.value } })} />
-              <input className="border rounded px-3 py-2" placeholder="Город" value={profile.basics.city} onChange={e => setProfile({ ...profile, basics: { ...profile.basics, city: e.target.value } })} />
+          {/* PDF Upload Section */}
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Загрузка PDF резюме</h2>
+            <PDFUploadZone
+              onFileSelect={setPdfFile}
+              onUpload={uploadPdf}
+              isUploading={busy}
+              selectedFile={pdfFile}
+            />
+          </section>
+
+          {/* Basic Information */}
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Основная информация</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">ФИО *</label>
+                <input
+                  type="text"
+                  value={profile.basics.full_name}
+                  onChange={e => setProfile({ ...profile, basics: { ...profile.basics, full_name: e.target.value } })}
+                  placeholder="Иванов Иван Иванович"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                <input
+                  type="email"
+                  value={profile.basics.email}
+                  onChange={e => setProfile({ ...profile, basics: { ...profile.basics, email: e.target.value } })}
+                  placeholder="ivan@example.com"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Город</label>
+                <input
+                  type="text"
+                  value={profile.basics.city}
+                  onChange={e => setProfile({ ...profile, basics: { ...profile.basics, city: e.target.value } })}
+                  placeholder="Алматы"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+              </div>
             </div>
-            <textarea className="border rounded px-3 py-2" placeholder="Кратко о себе" value={profile.summary} onChange={e => setProfile({ ...profile, summary: e.target.value })} />
-            <div className="flex items-center gap-2">
-              <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
-              <button className="btn-outline flex items-center gap-2" onClick={uploadPdf} disabled={busy}>
-                {busy ? <LoadingSpinner size="sm" /> : null}
-                {busy ? 'Загрузка...' : 'Загрузить PDF'}
-              </button>
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">О себе</label>
+              <textarea
+                value={profile.summary}
+                onChange={e => setProfile({ ...profile, summary: e.target.value })}
+                placeholder="Кратко расскажите о себе, ваших целях и достижениях"
+                rows={4}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+              />
             </div>
           </section>
 
           {/* Skills */}
-          <section className="card p-4 space-y-2">
-            <h2 className="text-lg font-semibold">Навыки</h2>
-            {profile.skills.map((skill: string, i: number) => (
-              <input key={i} className="border rounded px-3 py-2" placeholder="Навык" value={skill} onChange={e => setProfile({ ...profile, skills: profile.skills.map((s: string, j: number) => j === i ? e.target.value : s) })} />
-            ))}
-            <button className="btn-outline" onClick={() => setProfile({ ...profile, skills: [...profile.skills, ''] })}>Добавить навык</button>
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <SkillsInput
+              skills={profile.skills}
+              onChange={(skills) => setProfile({ ...profile, skills })}
+            />
           </section>
 
           {/* Experience */}
-          <section className="card p-4 space-y-2">
-            <h2 className="text-lg font-semibold">Опыт работы</h2>
-            {profile.experience.map((exp: any, i: number) => (
-              <div key={i} className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <input className="border rounded px-3 py-2" placeholder="Компания" value={exp.company} onChange={e => setProfile({ ...profile, experience: profile.experience.map((ex: any, j: number) => j === i ? { ...ex, company: e.target.value } : ex) })} />
-                <input className="border rounded px-3 py-2" placeholder="Должность" value={exp.title} onChange={e => setProfile({ ...profile, experience: profile.experience.map((ex: any, j: number) => j === i ? { ...ex, title: e.target.value } : ex) })} />
-                <input className="border rounded px-3 py-2" placeholder="Начало" value={exp.start} onChange={e => setProfile({ ...profile, experience: profile.experience.map((ex: any, j: number) => j === i ? { ...ex, start: e.target.value } : ex) })} />
-                <input className="border rounded px-3 py-2" placeholder="Конец" value={exp.end} onChange={e => setProfile({ ...profile, experience: profile.experience.map((ex: any, j: number) => j === i ? { ...ex, end: e.target.value } : ex) })} />
-                <textarea className="border rounded px-3 py-2 md:col-span-2" placeholder="Описание" value={exp.description} onChange={e => setProfile({ ...profile, experience: profile.experience.map((ex: any, j: number) => j === i ? { ...ex, description: e.target.value } : ex) })} />
-              </div>
-            ))}
-            <button className="btn-outline" onClick={() => setProfile({ ...profile, experience: [...profile.experience, { company: '', title: '', start: '', end: '', description: '' }] })}>Добавить опыт</button>
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <ExperienceInput
+              experiences={profile.experience}
+              onChange={(experiences) => setProfile({ ...profile, experience: experiences })}
+            />
           </section>
 
           {/* Education */}
-          <section className="card p-4 space-y-2">
-            <h2 className="text-lg font-semibold">Образование</h2>
-            {profile.education.map((edu: any, i: number) => (
-              <div key={i} className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <input className="border rounded px-3 py-2" placeholder="Учебное заведение" value={edu.place} onChange={e => setProfile({ ...profile, education: profile.education.map((ed: any, j: number) => j === i ? { ...ed, place: e.target.value } : ed) })} />
-                <input className="border rounded px-3 py-2" placeholder="Степень" value={edu.degree} onChange={e => setProfile({ ...profile, education: profile.education.map((ed: any, j: number) => j === i ? { ...ed, degree: e.target.value } : ed) })} />
-                <input className="border rounded px-3 py-2" placeholder="Начало" value={edu.start} onChange={e => setProfile({ ...profile, education: profile.education.map((ed: any, j: number) => j === i ? { ...ed, start: e.target.value } : ed) })} />
-                <input className="border rounded px-3 py-2" placeholder="Конец" value={edu.end} onChange={e => setProfile({ ...profile, education: profile.education.map((ed: any, j: number) => j === i ? { ...ed, end: e.target.value } : ed) })} />
-              </div>
-            ))}
-            <button className="btn-outline" onClick={() => setProfile({ ...profile, education: [...profile.education, { place: '', degree: '', start: '', end: '' }] })}>Добавить образование</button>
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <EducationInput
+              educations={profile.education}
+              onChange={(educations) => setProfile({ ...profile, education: educations })}
+            />
           </section>
 
           {/* Certificates */}
-          <section className="card p-4 space-y-2">
-            <h2 className="text-lg font-semibold">Сертификаты</h2>
-            {profile.certificates.map((cert: any, i: number) => (
-              <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <input className="border rounded px-3 py-2" placeholder="Название" value={cert.name} onChange={e => setProfile({ ...profile, certificates: profile.certificates.map((c: any, j: number) => j === i ? { ...c, name: e.target.value } : c) })} />
-                <input className="border rounded px-3 py-2" placeholder="Организация" value={cert.issuer} onChange={e => setProfile({ ...profile, certificates: profile.certificates.map((c: any, j: number) => j === i ? { ...c, issuer: e.target.value } : c) })} />
-                <input className="border rounded px-3 py-2" placeholder="Год" value={cert.year} onChange={e => setProfile({ ...profile, certificates: profile.certificates.map((c: any, j: number) => j === i ? { ...c, year: e.target.value } : c) })} />
-              </div>
-            ))}
-            <button className="btn-outline" onClick={() => setProfile({ ...profile, certificates: [...profile.certificates, { name: '', issuer: '', year: '' }] })}>Добавить сертификат</button>
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <CertificatesInput
+              certificates={profile.certificates}
+              onChange={(certificates) => setProfile({ ...profile, certificates })}
+            />
           </section>
 
-          <div className="flex gap-2">
-            <button className="btn-primary flex items-center gap-2" onClick={save} disabled={busy}>
+          {/* Save Button */}
+          <div className="flex justify-center">
+            <button 
+              className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 text-lg font-medium"
+              onClick={save} 
+              disabled={busy}
+            >
               {busy ? <LoadingSpinner size="sm" /> : null}
-              {busy ? 'Сохранение...' : 'Сохранить'}
+              {busy ? 'Сохранение...' : 'Сохранить профиль'}
             </button>
           </div>
         </div>
