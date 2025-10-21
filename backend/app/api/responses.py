@@ -159,8 +159,9 @@ async def list_responses(
     if vacancy_id:
         query = query.where(CandidateResponse.vacancy_id == vacancy_id)
     
-    # Temporarily exclude AI columns that might not exist in production
+    # Use fallback query that works without AI columns
     try:
+        # First try the full query
         result = await db.execute(query.order_by(CandidateResponse.created_at.desc()))
         rows = result.all()
     except Exception as e:

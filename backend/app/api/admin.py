@@ -20,21 +20,33 @@ async def fix_database_schema(
     This endpoint can be called to fix the schema issue.
     """
     try:
-        # Add missing columns
-        await db.execute(text("""
-            ALTER TABLE candidate_responses 
-            ADD COLUMN IF NOT EXISTS mismatch_analysis JSONB;
-        """))
+        # Add missing columns with error handling
+        try:
+            await db.execute(text("""
+                ALTER TABLE candidate_responses 
+                ADD COLUMN IF NOT EXISTS mismatch_analysis JSONB;
+            """))
+            print("✅ Added mismatch_analysis column")
+        except Exception as e:
+            print(f"⚠️  Error adding mismatch_analysis: {e}")
         
-        await db.execute(text("""
-            ALTER TABLE candidate_responses 
-            ADD COLUMN IF NOT EXISTS dialog_findings JSONB;
-        """))
+        try:
+            await db.execute(text("""
+                ALTER TABLE candidate_responses 
+                ADD COLUMN IF NOT EXISTS dialog_findings JSONB;
+            """))
+            print("✅ Added dialog_findings column")
+        except Exception as e:
+            print(f"⚠️  Error adding dialog_findings: {e}")
         
-        await db.execute(text("""
-            ALTER TABLE candidate_responses 
-            ADD COLUMN IF NOT EXISTS language_preference VARCHAR(5) DEFAULT 'ru';
-        """))
+        try:
+            await db.execute(text("""
+                ALTER TABLE candidate_responses 
+                ADD COLUMN IF NOT EXISTS language_preference VARCHAR(5) DEFAULT 'ru';
+            """))
+            print("✅ Added language_preference column")
+        except Exception as e:
+            print(f"⚠️  Error adding language_preference: {e}")
         
         await db.commit()
         

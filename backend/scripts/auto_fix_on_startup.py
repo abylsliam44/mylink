@@ -18,8 +18,18 @@ async def auto_fix_schema():
         print("⚠️  DATABASE_URL not found, skipping schema fix")
         return False
     
+    # Fix database URL format for asyncpg
+    if database_url.startswith('postgresql://'):
+        database_url = database_url.replace('postgresql://', 'postgresql+asyncpg://')
+    
     print("🔧 Auto-fixing database schema on startup...")
-    engine = create_async_engine(database_url)
+    print(f"🔗 Database URL: {database_url[:50]}...")
+    
+    try:
+        engine = create_async_engine(database_url)
+    except Exception as e:
+        print(f"❌ Failed to create engine: {e}")
+        return False
     
     try:
         async with engine.begin() as conn:

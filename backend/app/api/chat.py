@@ -89,17 +89,20 @@ async def chat_websocket(
                 return
 
             # Check if interview already has questions (resume chat)
-            # Check if mismatch_analysis exists and has questions
+            # Check if mismatch_analysis exists and has questions (with fallback for missing columns)
+            mismatch_analysis = getattr(response, 'mismatch_analysis', None)
+            dialog_findings = getattr(response, 'dialog_findings', None)
+            
             has_existing_questions = (
-                response.mismatch_analysis and 
-                isinstance(response.mismatch_analysis, dict) and
-                response.mismatch_analysis.get("questions")
+                mismatch_analysis and 
+                isinstance(mismatch_analysis, dict) and
+                mismatch_analysis.get("questions")
             )
             
             if has_existing_questions:
                 # Resume existing interview
-                interview_questions = response.mismatch_analysis.get("questions", [])
-                current_question_index = len(response.dialog_findings.get("answers", [])) if response.dialog_findings else 0
+                interview_questions = mismatch_analysis.get("questions", [])
+                current_question_index = len(dialog_findings.get("answers", [])) if dialog_findings else 0
 
                 # Send next question if available
                 if current_question_index < len(interview_questions):
@@ -146,7 +149,7 @@ async def chat_websocket(
                 interview_result = await interview_service.start_interview(
                     response_id=response_id,
                     db=db,
-                    language=response.language_preference or "ru"
+                    language=getattr(response, 'language_preference', None) or "ru"
                 )
 
                 interview_questions = interview_result["questions"]

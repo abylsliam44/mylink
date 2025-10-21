@@ -197,12 +197,73 @@ class EmployerAssistantBody(BaseModel):
 async def employer_assistant(body: EmployerAssistantBody, db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
     """Answer employer questions about candidates for a vacancy using LLM and real scores."""
     # Load responses with candidate names
-    q = (
-        select(CandidateResponse, CandidateModel)
-        .join(CandidateModel, CandidateResponse.candidate_id == CandidateModel.id)
-        .where(CandidateResponse.vacancy_id == body.vacancy_id)
-    )
-    rows = (await db.execute(q)).all()
+    # Use fallback query that works without AI columns
+    try:
+        q = (
+            select(CandidateResponse, CandidateModel)
+            .join(CandidateModel, CandidateResponse.candidate_id == CandidateModel.id)
+            .where(CandidateResponse.vacancy_id == body.vacancy_id)
+        )
+        rows = (await db.execute(q)).all()
+    except Exception as e:
+        if "mismatch_analysis" in str(e) or "dialog_findings" in str(e) or "language_preference" in str(e):
+            print(f"⚠️  AI columns missing, using fallback query: {e}")
+            # Fallback query without AI columns
+            q = (
+                select(
+                    CandidateResponse.id,
+                    CandidateResponse.vacancy_id,
+                    CandidateResponse.candidate_id,
+                    CandidateResponse.status,
+                    CandidateResponse.relevance_score,
+                    CandidateResponse.rejection_reasons,
+                    CandidateResponse.created_at,
+                    CandidateModel.id.label("candidate_id"),
+                    CandidateModel.full_name,
+                    CandidateModel.email,
+                    CandidateModel.phone,
+                    CandidateModel.city,
+                    CandidateModel.resume_text,
+                    CandidateModel.created_at.label("candidate_created_at")
+                )
+                .join(CandidateModel, CandidateResponse.candidate_id == CandidateModel.id)
+                .where(CandidateResponse.vacancy_id == body.vacancy_id)
+            )
+            result = await db.execute(q)
+            rows = result.all()
+            
+            # Convert to the expected format
+            converted_rows = []
+            for row in rows:
+                # Create a mock response object
+                mock_response = type('MockResponse', (), {
+                    'id': row.id,
+                    'vacancy_id': row.vacancy_id,
+                    'candidate_id': row.candidate_id,
+                    'status': row.status,
+                    'relevance_score': row.relevance_score,
+                    'rejection_reasons': row.rejection_reasons,
+                    'created_at': row.created_at,
+                    'mismatch_analysis': None,
+                    'dialog_findings': None,
+                    'language_preference': 'ru'
+                })()
+                
+                # Create a mock candidate object
+                mock_candidate = type('MockCandidate', (), {
+                    'id': row.candidate_id,
+                    'full_name': row.full_name,
+                    'email': row.email,
+                    'phone': row.phone,
+                    'city': row.city,
+                    'resume_text': row.resume_text,
+                    'created_at': row.candidate_created_at
+                })()
+                
+                converted_rows.append((mock_response, mock_candidate))
+            rows = converted_rows
+        else:
+            raise e
     if not rows:
         return {"answer": "Пока нет откликов по этой вакансии."}
 

@@ -26,10 +26,10 @@ class CandidateResponse(Base):
     rejection_reasons = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
-    # AI Interview fields
+    # AI Interview fields - made optional for backward compatibility
     mismatch_analysis = Column(JSON, nullable=True, comment="Initial mismatch detection results from AI")
     dialog_findings = Column(JSON, nullable=True, comment="Collected answers and findings during interview")
-    language_preference = Column(String(5), default="ru", nullable=False, comment="Interview language: ru, kk, en")
+    language_preference = Column(String(5), default="ru", nullable=True, comment="Interview language: ru, kk, en")
     
     # Relationships
     vacancy = relationship("Vacancy", back_populates="responses")
