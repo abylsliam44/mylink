@@ -378,6 +378,16 @@ export default function Catalog() {
             localStorage.setItem('candidate_email', email)
             localStorage.setItem('candidate_city', city)
           } catch {}
+          
+          // Save basic profile data
+          const basicProfile = {
+            skills: [],
+            experience: [],
+            education: [],
+            certificates: [],
+            resume_text: resumeSnippet || ''
+          }
+          await api.put(`/candidates/${cid}/profile`, basicProfile)
         } catch (e: any) {
           console.error('Candidate creation error:', e)
           showError('Ошибка создания профиля', 'Не удалось создать профиль кандидата. Попробуйте ещё раз.')

@@ -38,39 +38,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.exception("Failed ensuring DB schema: %s", e)
     
-    # Auto-fix database schema for production
-    try:
-        from sqlalchemy import text
-        async with async_engine.begin() as conn:
-            # Add missing columns if they don't exist
-            try:
-                await conn.execute(text("""
-                    ALTER TABLE candidate_responses 
-                    ADD COLUMN IF NOT EXISTS mismatch_analysis JSONB;
-                """))
-                logger.info("✅ Added mismatch_analysis column")
-            except Exception as e:
-                logger.warning(f"⚠️  Error adding mismatch_analysis: {e}")
-            
-            try:
-                await conn.execute(text("""
-                    ALTER TABLE candidate_responses 
-                    ADD COLUMN IF NOT EXISTS dialog_findings JSONB;
-                """))
-                logger.info("✅ Added dialog_findings column")
-            except Exception as e:
-                logger.warning(f"⚠️  Error adding dialog_findings: {e}")
-            
-            try:
-                await conn.execute(text("""
-                    ALTER TABLE candidate_responses 
-                    ADD COLUMN IF NOT EXISTS language_preference VARCHAR(5) DEFAULT 'ru';
-                """))
-                logger.info("✅ Added language_preference column")
-            except Exception as e:
-                logger.warning(f"⚠️  Error adding language_preference: {e}")
-    except Exception as e:
-        logger.warning("Auto-fix schema failed (non-critical): %s", e)
     
     # Register AI agents
     register_all_agents()
