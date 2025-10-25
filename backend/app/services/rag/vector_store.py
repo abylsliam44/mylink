@@ -24,7 +24,7 @@ class VectorStore:
         self.vector_size = 1536
         
         # Initialize OpenAI
-        openai.api_key = os.getenv("OPENAI_API_KEY")
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
         
     async def initialize_collection(self):
         """Create collection if it doesn't exist"""
@@ -50,7 +50,9 @@ class VectorStore:
     async def generate_embedding(self, text: str) -> List[float]:
         """Generate embedding for text using OpenAI"""
         try:
-            response = await openai.embeddings.acreate(
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=self.openai_api_key)
+            response = await client.embeddings.create(
                 model=self.embedding_model,
                 input=text
             )
