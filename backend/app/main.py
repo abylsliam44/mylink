@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import logging
 
 from app.config import settings
-from app.api import auth, employers, vacancies, candidates, responses, chat, admin
+from app.api import auth, employers, vacancies, candidates, responses, chat, admin, rag
 from app.api import ai as ai_router
 from app.db.redis import close_redis
 from app.services.ai.registry_setup import register_all_agents
@@ -82,6 +82,7 @@ app.include_router(candidates.router)
 app.include_router(responses.router)
 app.include_router(chat.router)
 app.include_router(ai_router.router)
+app.include_router(rag.router)
 app.include_router(admin.router, prefix="/admin")
 
 
