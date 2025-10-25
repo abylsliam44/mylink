@@ -25,7 +25,7 @@ export default function ChatHistory({ responseId }: { responseId: string }) {
     const fetchChat = async () => {
       try {
         setLoading(true)
-        const res = await api.get(`/responses/${responseId}/chat`)
+        const res = await api.get(`/responses/${responseId}/chat`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })
         setChatData(res.data)
       } catch (err: any) {
         setError(err.response?.data?.detail || 'Failed to load chat history')

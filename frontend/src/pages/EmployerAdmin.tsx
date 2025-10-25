@@ -38,7 +38,7 @@ export default function EmployerAdmin() {
     setLoadingVacancies(true)
     setErrorVacancies('')
     try {
-    const r = await api.get('/vacancies/my')  // Changed to /my for employer-specific vacancies
+    const r = await api.get('/vacancies/my', { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })  // Changed to /my for employer-specific vacancies
     setVacancies(r.data)
     if (r.data.length && !activeVacancyId) setActiveVacancyId(r.data[0].id)
     } catch (e: any) {
@@ -52,7 +52,7 @@ export default function EmployerAdmin() {
     setLoadingResponses(true)
     setErrorResponses('')
     try {
-    const r = await api.get(`/responses?vacancy_id=${vacancyId}`)
+    const r = await api.get(`/responses?vacancy_id=${vacancyId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })
     setResponses(r.data)
       if (r.data.length) setSelectedResponse(r.data[0])
     } catch (e: any) {
@@ -86,7 +86,7 @@ export default function EmployerAdmin() {
   // charts removed in vertical layout; keep only KPI above
 
   const runPipeline = async (vacancyId: string, candidateId: string, responseId: string) => {
-    await api.post('/ai/pipeline/screen_by_ids', { vacancy_id: vacancyId, candidate_id: candidateId, response_id: responseId, limits: { max_questions: 3 } })
+    await api.post('/ai/pipeline/screen_by_ids', { vacancy_id: vacancyId, candidate_id: candidateId, response_id: responseId, limits: { max_questions: 3 } }, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })
     await loadResponses(vacancyId)
   }
 
@@ -100,7 +100,7 @@ export default function EmployerAdmin() {
         candidate_id: selectedResponse.candidate_id,
         response_id: selectedResponse.id,
         limits: { max_questions: 3 }
-      })
+      }, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })
       setAiData(r.data)
       setAiCache((c) => ({ ...c, [selectedResponse.id]: r.data }))
       // refresh row to pick persisted score

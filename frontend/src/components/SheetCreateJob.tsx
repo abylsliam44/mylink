@@ -55,7 +55,7 @@ export default function SheetCreateJob({ open, onClose, onCreated }: Props) {
           langs: langs.split(',').map(s => s.trim()).filter(Boolean),
         }
       }
-      await api.post('/vacancies', req)
+      await api.post('/vacancies', req, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })
       if (onCreated) await onCreated()
       close()
     } catch (e: any) {

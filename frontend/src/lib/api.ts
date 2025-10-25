@@ -3,10 +3,9 @@ import axios from 'axios'
 // Backend origin for direct connections (WS, non-proxied calls)
 const DEFAULT_BACKEND = 'https://mylink-trn6.onrender.com'
 
-// In production, hardcode the only allowed frontend origin and use same-origin '/api'.
+// In production, use the full backend URL
 const isProd = import.meta.env.PROD === true
-// const PROD_FRONTEND = 'https://mylink-rouge.vercel.app'
-const HTTP_BASE = isProd ? '/api' : ((import.meta.env.VITE_API_URL as string | undefined) || '/api')
+const HTTP_BASE = isProd ? DEFAULT_BACKEND : ((import.meta.env.VITE_API_URL as string | undefined) || '/api')
 
 // Для WebSocket и построения wsUrl нужен полный origin бэка (может быть кросс-доменным)
 const BACKEND_ORIGIN = isProd

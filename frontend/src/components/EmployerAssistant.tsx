@@ -22,7 +22,7 @@ export default function EmployerAssistant({ vacancyId, onClose }: { vacancyId: s
       // Try LLM-backed assistant endpoint first for arbitrary questions
       if (!['топ','сравни','пересчитай'].some(k => text.toLowerCase().includes(k))) {
         try {
-          const r = await api.post('/ai/employer/assistant', { vacancy_id: vacancyId, question: text })
+          const r = await api.post('/ai/employer/assistant', { vacancy_id: vacancyId, question: text }, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })
           await typeAssistant(r.data.answer || 'Нет ответа')
           return
         } catch {}
@@ -42,25 +42,25 @@ export default function EmployerAssistant({ vacancyId, onClose }: { vacancyId: s
   const rescoreAll = async () => {
     await typeAssistant('Пересчитываю всех кандидатов…')
     // Получаем отклики по вакансии и прогоняем пайплайн для тех, у кого нет relevance_score
-    const r = await api.get(`/responses?vacancy_id=${vacancyId}`)
+    const r = await api.get(`/responses?vacancy_id=${vacancyId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })
     const list = r.data as any[]
     for (const it of list) {
       try {
-        await api.post('/ai/pipeline/screen_by_ids', { vacancy_id: vacancyId, candidate_id: it.candidate_id, response_id: it.id, limits: { max_questions: 0 } })
+        await api.post('/ai/pipeline/screen_by_ids', { vacancy_id: vacancyId, candidate_id: it.candidate_id, response_id: it.id, limits: { max_questions: 0 } }, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })
       } catch {}
     }
     await typeAssistant('Готово. Обновите список — метрики пересчитаны.')
   }
 
   const showTop = async () => {
-    const r = await api.get(`/responses?vacancy_id=${vacancyId}`)
+    const r = await api.get(`/responses?vacancy_id=${vacancyId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })
     const list = (r.data as any[]).slice().sort((a, b) => (b.relevance_score || 0) - (a.relevance_score || 0))
     const top = list.slice(0, 3).map((x, i) => `${i + 1}) ${x.candidate_name} — ${Math.round((x.relevance_score || 0) * 100)}%`).join('\n') || 'Данных пока нет'
     await typeAssistant(`Топ кандидатов:\n${top}`)
   }
 
   const comparePair = async (_: string) => {
-    const r = await api.get(`/responses?vacancy_id=${vacancyId}`)
+    const r = await api.get(`/responses?vacancy_id=${vacancyId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })
     const list = r.data as any[]
     // простая эвристика: возьмём первых двух по score
     const sorted = list.slice().sort((a, b) => (b.relevance_score || 0) - (a.relevance_score || 0))
@@ -82,14 +82,14 @@ export default function EmployerAssistant({ vacancyId, onClose }: { vacancyId: s
   function pct(v?: number) { return Math.round(((v || 0) * 100)) }
 
   const bestCandidateExplanation = async () => {
-    const r = await api.get(`/responses?vacancy_id=${vacancyId}`)
+    const r = await api.get(`/responses?vacancy_id=${vacancyId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })
     const list = (r.data as any[]).slice().sort((a, b) => (b.relevance_score || 0) - (a.relevance_score || 0))
     if (!list.length) { await typeAssistant('Пока нет откликов для анализа.'); return }
     const top = list[0]
     if (!top.rejection_reasons) {
-      try { await api.post('/ai/pipeline/screen_by_ids', { vacancy_id: vacancyId, candidate_id: top.candidate_id, response_id: top.id, limits: { max_questions: 0 } }) } catch {}
+      try { await api.post('/ai/pipeline/screen_by_ids', { vacancy_id: vacancyId, candidate_id: top.candidate_id, response_id: top.id, limits: { max_questions: 0 } }, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } }) } catch {}
     }
-    const refreshed = (await api.get(`/responses?vacancy_id=${vacancyId}`)).data as any[]
+    const refreshed = (await api.get(`/responses?vacancy_id=${vacancyId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })).data as any[]
     const best = refreshed.find(x => x.id === top.id) || top
     const pos = (best.rejection_reasons?.summary?.positives || []).slice(0, 3).join('; ') || '—'
     const risks = (best.rejection_reasons?.summary?.risks || []).slice(0, 3).join('; ') || '—'

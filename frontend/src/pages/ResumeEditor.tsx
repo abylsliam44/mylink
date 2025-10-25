@@ -33,7 +33,7 @@ export default function ResumeEditor() {
     const load = async () => {
       if (!candidateId) return
       try {
-        const r = await api.get(`/candidates/${candidateId}/profile`)
+        const r = await api.get(`/candidates/${candidateId}`)
         setProfile(r.data)
       } catch {}
     }
@@ -47,7 +47,7 @@ export default function ResumeEditor() {
     }
     setBusy(true)
     try {
-      await api.put(`/candidates/${candidateId}/profile`, profile)
+      await api.put(`/candidates/${candidateId}`, profile)
       showSuccess('Профиль сохранён', 'Ваш профиль успешно обновлён')
     } catch (e: any) {
       console.error('Save profile error:', e)

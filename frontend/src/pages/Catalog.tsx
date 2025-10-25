@@ -79,7 +79,7 @@ export default function Catalog() {
   useEffect(() => {
     if (candidateId) {
       // Check if candidate has resume data
-      api.get(`/candidates/${candidateId}/profile`)
+      api.get(`/candidates/${candidateId}`)
         .then(response => {
           const profile = response.data
           if (profile && profile.resume_text && profile.resume_text.trim()) {
@@ -379,15 +379,7 @@ export default function Catalog() {
             localStorage.setItem('candidate_city', city)
           } catch {}
           
-          // Save basic profile data
-          const basicProfile = {
-            skills: [],
-            experience: [],
-            education: [],
-            certificates: [],
-            resume_text: resumeSnippet || ''
-          }
-          await api.put(`/candidates/${cid}/profile`, basicProfile)
+          // Profile data is already saved in candidate creation
         } catch (e: any) {
           console.error('Candidate creation error:', e)
           showError('Ошибка создания профиля', 'Не удалось создать профиль кандидата. Попробуйте ещё раз.')
@@ -396,38 +388,18 @@ export default function Catalog() {
         }
       }
       
-      // Check if profile is filled (has skills, experience, etc.)
+      // Check if candidate has resume text
       try {
-        const profileResponse = await api.get(`/candidates/${cid}/profile`)
-        const profile = profileResponse.data
-        
-        // Check if profile exists and has required data
-        if (!profile || typeof profile !== 'object') {
-          showError('Профиль не найден', 'Заполните профиль полностью')
-          setShowResumeEditor(true)
-          setBusy(false)
-          return
-        }
-        
-        const hasSkills = profile.skills && Array.isArray(profile.skills) && profile.skills.length > 0 && profile.skills.some((s: string) => s && s.trim())
-        const hasExperience = profile.experience && Array.isArray(profile.experience) && profile.experience.length > 0 && profile.experience.some((exp: any) => exp && exp.company && exp.title)
-        const hasResumeText = profile.resume_text && profile.resume_text.trim()
-        
-        if (!hasResumeText) {
+        const candidateResponse = await api.get(`/candidates/${cid}`)
+        const candidate = candidateResponse.data
+        if (!candidate || !candidate.resume_text || !candidate.resume_text.trim()) {
           showWarning('Требуется резюме', 'Для точной оценки загрузите PDF резюме')
           setShowResumeEditor(true)
           setBusy(false)
           return
         }
-        
-        if (!hasSkills || !hasExperience) {
-          showWarning('Неполный профиль', 'Для точной оценки заполните профиль: навыки и опыт работы')
-          setShowResumeEditor(true)
-          setBusy(false)
-          return
-        }
       } catch (e: any) {
-        console.error('Profile check error:', e)
+        console.error('Candidate check error:', e)
         showError('Ошибка проверки профиля', 'Заполните профиль полностью')
         setShowResumeEditor(true)
         setBusy(false)

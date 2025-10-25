@@ -1,0 +1,66 @@
+services:
+  - type: web
+    name: smartbot-backend
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smartbot-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: smartbot-redis
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_ORIGINS
+        value: "https://mylink-rouge.vercel.app"
+      - key: ALLOWED_ORIGIN_REGEX
+        value: "null"
+      - key: AI_APPROVAL_THRESHOLD
+        value: "70"
+      - key: AI_MAX_QUESTIONS
+        value: "3"
+      - key: AI_TONE
+        value: "professional"
+      - key: AGENT_HEALTH_CHECK_INTERVAL
+        value: "30"
+      - key: AGENT_MAX_RETRIES
+        value: "3"
+      - key: AGENT_QUEUE_SIZE
+        value: "1000"
+      - key: ALGORITHM
+        value: "HS256"
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: OPENAI_MODEL
+        value: "gpt-4o-mini"
+      - key: OPENAI_TIMEOUT
+        value: "30"
+      - key: OPENAI_MAX_RETRIES
+        value: "2"
+      - key: DATABASE_URL_SYNC
+        fromDatabase:
+          name: smartbot-db
+          property: connectionString
+
+databases:
+  - name: smartbot-db
+    plan: free
+
+  - name: smartbot-redis
+    type: redis
+    plan: free

@@ -52,7 +52,7 @@ export default function InterviewSummary({ responseId }: { responseId: string })
     const fetchSummary = async () => {
       try {
         setLoading(true)
-        const res = await api.get(`/responses/${responseId}/summary`)
+        const res = await api.get(`/responses/${responseId}/summary`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })
         setSummary(res.data)
       } catch (err: any) {
         setError(err.response?.data?.detail || 'Failed to load summary')
