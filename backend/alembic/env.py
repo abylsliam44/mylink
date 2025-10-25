@@ -6,6 +6,7 @@ import os
 import sys
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.orm import declarative_base
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -13,6 +14,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from app.config import settings
 from app.db.base import Base
 from app.models import *  # Import all models
+
+# Ensure all models are imported
+from app.models.candidate import Candidate
+from app.models.employer import Employer
+from app.models.vacancy import Vacancy
+from app.models.response import CandidateResponse
+from app.models.chat import ChatMessage
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -53,8 +61,10 @@ def run_migrations_offline() -> None:
 
     """
     url = config.get_main_option("sqlalchemy.url")
+    clean_url = clean_database_url(url)
+    
     context.configure(
-        url=url,
+        url=clean_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -66,6 +76,12 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online_sync() -> None:
     """Run migrations using sync engine."""
+    url = config.get_main_option("sqlalchemy.url")
+    clean_url = clean_database_url(url)
+    
+    # Update config with cleaned URL
+    config.set_main_option("sqlalchemy.url", clean_url)
+    
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -84,10 +100,28 @@ def do_run_migrations(connection):
         context.run_migrations()
 
 
+def clean_database_url(url: str) -> str:
+    """Remove unsupported SSL parameters for asyncpg"""
+    from urllib.parse import urlparse, parse_qs, urlunparse
+    parsed = urlparse(url)
+    query_params = parse_qs(parsed.query)
+    
+    # Remove sslmode and other unsupported parameters
+    unsupported_params = ['sslmode', 'sslcert', 'sslkey', 'sslrootcert']
+    for param in unsupported_params:
+        query_params.pop(param, None)
+    
+    # Rebuild query string
+    new_query = '&'.join([f"{k}={v[0]}" for k, v in query_params.items()])
+    new_parsed = parsed._replace(query=new_query)
+    
+    return urlunparse(new_parsed)
+
 async def run_migrations_online_async() -> None:
     """Run migrations using async engine if URL is async."""
     url = config.get_main_option("sqlalchemy.url")
-    connectable = create_async_engine(url, poolclass=pool.NullPool)
+    clean_url = clean_database_url(url)
+    connectable = create_async_engine(clean_url, poolclass=pool.NullPool)
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
 
