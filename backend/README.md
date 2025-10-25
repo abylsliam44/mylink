@@ -7,7 +7,9 @@ Environment variables:
 - SECRET_KEY: random string
 - ALLOWED_ORIGINS: https://your-frontend.onrender.com
 - OPENAI_API_KEY: your key
-- OPENAI_MODEL: gpt-4.1
+- OPENAI_MODEL: gpt-4o-mini
+- QDRANT_URL: https://your-cluster-id.region.gcp.cloud.qdrant.io
+- QDRANT_API_KEY: your qdrant api key
 
 Build command:
 - pip install -r requirements.txt

@@ -61,30 +61,21 @@ def add_missing_columns_direct():
 
 
 def main():
-    print("🔧 Fixing production database migration state...")
+    print("🔧 Setting up clean database...")
     
     # Check if we're in production
     if not os.getenv('DATABASE_URL'):
         print("❌ DATABASE_URL not found. This script should be run in production.")
         sys.exit(1)
     
-    # First, check current migration state
-    print("\n📊 Checking Alembic availability (optional)...")
-    # Не критично, если alembic current падает на старом состоянии — продолжаем
-    run_command('alembic current || true')
+    # Run migrations to create all tables
+    print("\n📊 Running database migrations...")
+    if not run_command('alembic upgrade head'):
+        print("❌ Failed to run migrations")
+        sys.exit(1)
     
-    # Add missing columns if needed
-    print("\n🔧 Adding missing columns...")
-    add_missing_columns_direct()
-    
-    # Проставляем текущее состояние равным head без применения миграций (idempotent)
-    print("\n🏷️  Marking head migration as applied (stamp)...")
-    # Если версий нет, команда всё равно создаст таблицу alembic_version и отметит текущую
-    if not run_command('alembic stamp head || true'):
-        print("⚠️  Warning: failed to stamp head; continuing")
-    
-    print("\n✅ Database migration state fixed (idempotent).")
-    print("\n📚 Database is now aligned to current head (stamped).")
+    print("\n✅ Database setup completed successfully!")
+    print("\n📚 All tables created and ready for use.")
 
 
 if __name__ == "__main__":

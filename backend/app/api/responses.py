@@ -14,6 +14,7 @@ from app.models.chat import ChatSession, ChatMessage
 from app.utils.auth import get_current_employer
 from app.schemas.chat import ChatSessionResponse, ChatMessageResponse
 from app.services.interview_service import interview_service
+from app.services.autonomous_agents.integration import autonomous_agent_integration
 
 router = APIRouter(prefix="/responses", tags=["Responses"])
 
@@ -115,6 +116,19 @@ async def create_response(
     db.add(new_response)
     await db.flush()
     await db.refresh(new_response)
+    
+    # Integrate with autonomous agents (async, non-blocking)
+    try:
+        integration_result = await autonomous_agent_integration.integrate_candidate_application(
+            response_id=new_response.id,
+            db=db
+        )
+        if integration_result.get("error"):
+            # Log error but don't fail the response creation
+            print(f"Autonomous agent integration warning: {integration_result['error']}")
+    except Exception as e:
+        # Log error but don't fail the response creation
+        print(f"Autonomous agent integration error: {e}")
     
     return new_response
 
@@ -530,4 +544,47 @@ async def update_decision(
     await send_message_to_candidate(response_id, update_message, "hr_decision_update")
     
     return {"status": new_status, "message": f"Decision updated to {new_status} successfully"}
+
+
+@router.get("/{response_id}/enhanced-analysis")
+async def get_enhanced_analysis(
+    response_id: UUID,
+    analysis_type: str = "comprehensive",
+    db: AsyncSession = Depends(get_db)
+):
+    """Get enhanced analysis from autonomous agents"""
+    try:
+        # Verify response exists
+        result = await db.execute(
+            select(CandidateResponse).where(CandidateResponse.id == response_id)
+        )
+        response = result.scalar_one_or_none()
+        
+        if not response:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Response not found"
+            )
+        
+        # Get enhanced analysis from autonomous agents
+        analysis_result = await autonomous_agent_integration.get_enhanced_analysis(
+            response_id=response_id,
+            analysis_type=analysis_type
+        )
+        
+        if analysis_result.get("error"):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=analysis_result["error"]
+            )
+        
+        return analysis_result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 

@@ -24,12 +24,25 @@ class Settings(BaseSettings):
 
     # AI / OpenAI
     OPENAI_API_KEY: str | None = None
-    OPENAI_MODEL: str = "gpt-4.1"
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_TIMEOUT: int = 30
+    OPENAI_MAX_RETRIES: int = 2
+
+    # Qdrant
+    QDRANT_URL: str | None = None
+    QDRANT_API_KEY: str | None = None
+    QDRANT_HOST: str = "localhost"
+    QDRANT_PORT: int = 6333
 
     # AI policy
     AI_APPROVAL_THRESHOLD: int = 70
     AI_MAX_QUESTIONS: int = 3
-    AI_TONE: str = "neutral"
+    AI_TONE: str = "professional"
+    
+    # Autonomous Agents
+    AGENT_HEALTH_CHECK_INTERVAL: int = 30
+    AGENT_MAX_RETRIES: int = 3
+    AGENT_QUEUE_SIZE: int = 1000
     
     @property
     def allowed_origins_list(self) -> List[str]:

@@ -7,6 +7,7 @@ from app.schemas.employer import EmployerCreate, EmployerResponse
 from app.schemas.auth import Token
 from app.models.employer import Employer
 from app.utils.auth import get_password_hash, create_access_token, get_current_employer
+from app.services.autonomous_agents.integration import autonomous_agent_integration
 
 router = APIRouter(prefix="/employers", tags=["Employers"])
 
@@ -57,4 +58,88 @@ async def get_current_employer_info(
 ):
     """Get current employer information"""
     return current_employer
+
+
+@router.get("/{employer_id}/insights")
+async def get_employer_insights(
+    employer_id: str,
+    vacancy_id: str,
+    insights_type: str = "comprehensive",
+    current_employer: Employer = Depends(get_current_employer)
+):
+    """Get insights and analysis for employer"""
+    try:
+        # Verify employer access
+        if str(current_employer.id) != employer_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied"
+            )
+        
+        # Get insights from autonomous agents
+        insights_result = await autonomous_agent_integration.get_employer_insights(
+            employer_id=employer_id,
+            vacancy_id=vacancy_id,
+            insights_type=insights_type
+        )
+        
+        if insights_result.get("error"):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=insights_result["error"]
+            )
+        
+        return insights_result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post("/{employer_id}/view-candidate")
+async def view_candidate(
+    employer_id: str,
+    candidate_id: str,
+    vacancy_id: str,
+    current_employer: Employer = Depends(get_current_employer)
+):
+    """Record employer viewing a candidate (triggers autonomous analysis)"""
+    try:
+        # Verify employer access
+        if str(current_employer.id) != employer_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied"
+            )
+        
+        # Integrate with autonomous agents
+        integration_result = await autonomous_agent_integration.integrate_employer_view(
+            employer_id=employer_id,
+            candidate_id=candidate_id,
+            vacancy_id=vacancy_id,
+            db=None  # Will be handled internally
+        )
+        
+        if integration_result.get("error"):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=integration_result["error"]
+            )
+        
+        return {
+            "success": True,
+            "message": "Candidate view recorded and analysis initiated"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 

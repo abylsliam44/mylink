@@ -18,7 +18,13 @@ def get_llm(model: Optional[str] = None, temperature: float = 0.2) -> ChatOpenAI
 
 class LLMClient:
     def __init__(self):
-        self.llm = get_llm()
+        self._llm = None
+    
+    @property
+    def llm(self):
+        if self._llm is None:
+            self._llm = get_llm()
+        return self._llm
     
     async def generate_response(self, prompt: str) -> str:
         """Generate response using LLM"""
