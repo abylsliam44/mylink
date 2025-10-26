@@ -1,22 +1,30 @@
 from typing import Any, Dict
 import base64
 from io import BytesIO
-from pdf2image import convert_from_bytes
-import pytesseract
+try:
+    from pdf2image import convert_from_bytes  # type: ignore
+    import pytesseract  # type: ignore
+    _OCR_AVAILABLE = True
+except Exception:
+    convert_from_bytes = None  # type: ignore
+    pytesseract = None  # type: ignore
+    _OCR_AVAILABLE = False
 from app.services.ai.agents.mismatch_agent import MismatchDetectorAgent
 
 
 def _extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
     """Extract text from PDF using OCR Tesseract only."""
     text = ""
+    if not _OCR_AVAILABLE:
+        return ""
     try:
         # Convert PDF pages to images and use OCR
-        images = convert_from_bytes(pdf_bytes, fmt='png', dpi=300)
+        images = convert_from_bytes(pdf_bytes, fmt='png', dpi=300)  # type: ignore
         ocr_text_parts = []
-        for img in images:
+        for img in images:  # type: ignore
             try:
                 # Use Tesseract OCR with Russian and English languages
-                ocr_text = pytesseract.image_to_string(img, lang='eng+rus')
+                ocr_text = pytesseract.image_to_string(img, lang='eng+rus')  # type: ignore
                 if ocr_text.strip():
                     ocr_text_parts.append(ocr_text.strip())
             except Exception as e:
