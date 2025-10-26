@@ -1,54 +1,24 @@
-# Use Python 3.11 slim image
 FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
-
-# Set work directory
 WORKDIR /app
 
-# Install system dependencies
+# System deps (minimal)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    postgresql-client \
-    tesseract-ocr \
-    libtesseract-dev \
-    poppler-utils \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Python deps (with cache for Render)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --cache-dir /tmp/pip-cache -r requirements.txt \
+    && rm -rf /tmp/pip-cache
 
-# Copy application
+# App files
 COPY . .
 
-# Create non-root user
-RUN adduser --disabled-password --gecos '' appuser \
-    && chown -R appuser:appuser /app
-USER appuser
-
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:$PORT/health || exit 1
 
-# Expose port
 EXPOSE 8000
-
-# Create startup script that runs migrations and starts the server
-RUN echo '#!/bin/bash\n\
-set -e\n\
-echo "🚀 Starting SmartBot Backend..."\n\
-echo "🔧 Setting up clean database..."\n\
-echo "📊 Running database migrations..."\n\
-alembic upgrade head\n\
-echo "🌐 Starting server..."\n\
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4\n\
-' > /app/start.sh && chmod +x /app/start.sh
-
-CMD ["/app/start.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
 
