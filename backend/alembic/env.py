@@ -106,8 +106,12 @@ def clean_database_url(url: str) -> str:
     parsed = urlparse(url)
     query_params = parse_qs(parsed.query)
     
-    # Remove sslmode and other unsupported parameters
-    unsupported_params = ['sslmode', 'sslcert', 'sslkey', 'sslrootcert']
+    # Remove all unsupported parameters for asyncpg
+    unsupported_params = [
+        'sslmode', 'sslcert', 'sslkey', 'sslrootcert',
+        'channel_binding', 'gssencmode', 'target_session_attrs',
+        'application_name', 'fallback_application_name'
+    ]
     for param in unsupported_params:
         query_params.pop(param, None)
     
