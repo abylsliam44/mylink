@@ -5,7 +5,7 @@ Event-driven autonomous agents using LangGraph and Qdrant
 
 from .base_autonomous_agent import BaseAutonomousAgent
 from .agent_state import AgentState, AgentContext
-from .event_bus import EventBus, Event
+from .event_bus import EventBus, Event, event_bus
 from .agent_registry import AutonomousAgentRegistry
 from .candidate_agent import CandidateAutonomousAgent
 from .employer_agent import EmployerAutonomousAgent
@@ -17,6 +17,7 @@ __all__ = [
     "AgentContext",
     "EventBus",
     "Event",
+    "event_bus",
     "AutonomousAgentRegistry",
     "CandidateAutonomousAgent",
     "EmployerAutonomousAgent", 
