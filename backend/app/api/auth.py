@@ -65,7 +65,8 @@ async def candidate_register(body: CandidateRegister, db: AsyncSession = Depends
     if not cand:
         cand = Candidate(full_name=body.full_name, email=body.email, phone=body.phone, city=body.city, resume_text=body.resume_text)
         db.add(cand)
-        await db.flush()
+        await db.commit()
+        await db.refresh(cand)
     # Return token embedding candidate id in sub (prefix for clarity)
     token = create_access_token(data={"sub": str(cand.id), "email": cand.email, "role": "candidate"})
     return Token(access_token=token, token_type="bearer", candidate_id=cand.id)

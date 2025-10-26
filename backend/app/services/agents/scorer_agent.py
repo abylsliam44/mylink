@@ -526,3 +526,4 @@ class ScorerAgent(BaseAgent):
 
 # Global instance
 scorer_agent = ScorerAgent()
+

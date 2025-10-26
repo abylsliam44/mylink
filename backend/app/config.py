@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # App
     DEBUG: bool = True
     # Strict production frontend origin (Vercel)
-    ALLOWED_ORIGINS: str = "https://mylink-rouge.vercel.app"
+    ALLOWED_ORIGINS: str = "https://mylink-rouge.vercel.app,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
     # No regex wildcard; only exact origin above is allowed
     ALLOWED_ORIGIN_REGEX: str | None = None
 

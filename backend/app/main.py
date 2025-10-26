@@ -77,7 +77,15 @@ app.add_middleware(
 # Ensure preflight returns 204 even if route doesn't exist
 @app.options("/{rest_of_path:path}")
 async def options_handler(rest_of_path: str):
-    return Response(status_code=204)
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
 
 # Include routers
 app.include_router(auth.router)

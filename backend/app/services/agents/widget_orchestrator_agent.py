@@ -435,3 +435,4 @@ class WidgetOrchestratorAgent(BaseAgent):
 
 # Global instance
 widget_orchestrator_agent = WidgetOrchestratorAgent()
+

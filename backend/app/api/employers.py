@@ -41,7 +41,7 @@ async def register_employer(
     )
     
     db.add(new_employer)
-    await db.flush()
+    await db.commit()
     await db.refresh(new_employer)
     
     # Create access token
