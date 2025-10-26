@@ -5,6 +5,9 @@ WORKDIR /app
 # System deps (minimal for prod)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    tesseract-ocr \
+    libtesseract-dev \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Python deps (with cache for faster builds)

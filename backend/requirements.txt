@@ -38,3 +38,7 @@ sentence-transformers==2.2.2
 # Utils
 numpy==1.24.3
 
+# PDF processing (for OCR)
+pytesseract==0.3.13
+pdf2image==1.17.0
+
