@@ -17,10 +17,10 @@ class Settings(BaseSettings):
     
     # App
     DEBUG: bool = True
-    # Strict production frontend origin (Vercel)
-    ALLOWED_ORIGINS: str = "https://mylink-rouge.vercel.app,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
-    # No regex wildcard; only exact origin above is allowed
-    ALLOWED_ORIGIN_REGEX: str | None = None
+    # Strict production frontend origin(s)
+    ALLOWED_ORIGINS: str = "https://mylink-rouge.vercel.app,https://mylink.systems,https://www.mylink.systems,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    # Allow any subdomain on mylink.systems and vercel.app
+    ALLOWED_ORIGIN_REGEX: str | None = r"^https://([a-z0-9-]+\.)?(mylink\.systems|vercel\.app)$"
 
     # AI / OpenAI
     OPENAI_API_KEY: str | None = None

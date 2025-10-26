@@ -74,18 +74,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ensure preflight returns 204 even if route doesn't exist
-@app.options("/{rest_of_path:path}")
-async def options_handler(rest_of_path: str):
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Max-Age": "3600",
-        }
-    )
+# Note: Let CORSMiddleware handle all OPTIONS preflights to ensure
+# Access-Control-Allow-Origin reflects the requesting origin when
+# allow_credentials=True. Do not override OPTIONS globally.
 
 # Include routers
 app.include_router(auth.router)
