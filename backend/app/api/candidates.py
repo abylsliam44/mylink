@@ -12,8 +12,15 @@ from app.models.response import CandidateResponse as RespModel
 from app.models.response import ResponseStatus
 from app.models.vacancy import Vacancy
 
-from pdf2image import convert_from_bytes
-import pytesseract
+# Optional OCR deps; handle gracefully if not installed in deployment
+try:
+    from pdf2image import convert_from_bytes  # type: ignore
+    import pytesseract  # type: ignore
+    _OCR_AVAILABLE = True
+except Exception:
+    convert_from_bytes = None  # type: ignore
+    pytesseract = None  # type: ignore
+    _OCR_AVAILABLE = False
 from io import BytesIO
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
@@ -62,13 +69,15 @@ async def upload_candidate_pdf(
     if file.content_type not in {"application/pdf"}:
         raise HTTPException(status_code=400, detail="Поддерживается только PDF")
     content = await file.read()
+    if not _OCR_AVAILABLE:
+        raise HTTPException(status_code=503, detail="OCR недоступен в этой сборке. Обновите деплой с pdf2image/poppler+pytesseract или отправьте текст резюме.")
     try:
         # Use OCR Tesseract to extract text from PDF
-        images = convert_from_bytes(content, fmt='png', dpi=300)
+        images = convert_from_bytes(content, fmt='png', dpi=300)  # type: ignore
         ocr_text_parts = []
-        for img in images:
+        for img in images:  # type: ignore
             try:
-                ocr_text = pytesseract.image_to_string(img, lang='eng+rus')
+                ocr_text = pytesseract.image_to_string(img, lang='eng+rus')  # type: ignore
                 if ocr_text.strip():
                     ocr_text_parts.append(ocr_text.strip())
             except Exception as e:
