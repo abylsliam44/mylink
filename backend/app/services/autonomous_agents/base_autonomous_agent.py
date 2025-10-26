@@ -16,9 +16,12 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from .agent_state import AgentState, AgentStatus, AgentType, EventType, AgentContext
-from .event_bus import Event, event_bus
+from .event_bus import Event, event_bus as _event_bus
 from ..rag.rag_service import RAGService
 from ..ai.llm_client import get_llm
+
+# Use imported event_bus
+event_bus = _event_bus
 
 logger = logging.getLogger(__name__)
 
