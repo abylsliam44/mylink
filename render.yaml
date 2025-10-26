@@ -8,8 +8,8 @@ services:
       echo "🚀 Starting SmartBot Backend..."
       echo "📊 Running database migrations..."
       alembic upgrade head || echo "⚠️ Migration failed, continuing..."
-      echo "🌐 Starting server..."
-      uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+      echo "🌐 Starting server with 1 worker..."
+      gunicorn -c gunicorn.conf.py app.main:app
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
