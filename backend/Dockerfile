@@ -5,15 +5,15 @@ WORKDIR /app
 # System deps (minimal for prod)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    tesseract-ocr \
-    libtesseract-dev \
-    poppler-utils \
+    build-essential \
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Python deps (with cache for faster builds)
+# Python deps
 COPY requirements.txt .
-RUN pip install --cache-dir /tmp/pip-cache -r requirements.txt \
-    && rm -rf /tmp/pip-cache
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
 
 # App files
 COPY . .

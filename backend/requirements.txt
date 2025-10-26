@@ -22,23 +22,19 @@ email-validator==2.1.0.post1
 redis==5.0.1
 
 # AI/LangChain
-langchain==0.2.16
-langchain-openai==0.1.23
-langchain-core>=0.2.27,<0.3
-langchain-community>=0.2.16
-langchain-qdrant>=0.1.0
-langgraph>=0.2.16
-openai>=1.54.0,<2.0.0
+langchain>=0.2.0,<0.3.0
+langchain-openai>=0.1.0,<0.2.0
+langchain-core>=0.2.0,<0.3.0
+langchain-community>=0.2.0,<0.3.0
+langgraph>=0.2.0,<0.3.0
+openai>=1.40.0,<2.0.0
 
-# RAG
-qdrant-client>=1.9.0,<2.0.0
-tiktoken>=0.7,<1.0
-sentence-transformers==2.2.2
+# RAG (optional - commented out to simplify deployment, enable if needed)
+# qdrant-client>=1.9.0,<2.0.0
+# tiktoken>=0.7.0,<1.0.0
+# sentence-transformers>=2.7.0
 
-# Utils
-numpy==1.24.3
-
-# PDF processing (for OCR)
-pytesseract==0.3.13
-pdf2image==1.17.0
+# PDF processing (optional - commented out to simplify deployment)
+# pytesseract==0.3.13
+# pdf2image==1.17.0
 
