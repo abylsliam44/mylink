@@ -17,7 +17,7 @@ from langchain_openai import ChatOpenAI
 
 from .agent_state import AgentState, AgentStatus, AgentType, EventType, AgentContext
 from .event_bus import Event
-from ..rag.rag_service import RAGService
+from app.services.rag import RAGService
 from ..ai.llm_client import get_llm
 
 logger = logging.getLogger(__name__)

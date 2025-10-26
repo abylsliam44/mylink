@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Dict, Any, List
 from app.services.ai.agents.question_generator_agent import QuestionGeneratorAgent
-from app.services.rag.rag_service import rag_service
+from app.services.rag import rag_service
 
 logger = logging.getLogger(__name__)
 

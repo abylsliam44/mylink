@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from uuid import UUID
 
 from app.db.session import get_db
-from app.services.rag.rag_service import rag_service
+from app.services.rag import rag_service
 from app.services.rag.knowledge_base import get_hr_knowledge, get_it_skills_taxonomy, get_interview_questions
 from app.models.vacancy import Vacancy
 from app.models.candidate import Candidate
