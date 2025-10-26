@@ -76,6 +76,31 @@ class AgentMetricsResponse(BaseModel):
 #         logger.error(f"Failed to stop autonomous agents: {e}")
 
 
+# Manual start/stop controls
+@router.post("/start")
+async def start_agents():
+    """Manually start autonomous agents system"""
+    try:
+        await autonomous_agent_orchestrator.start()
+        logger.info("Autonomous agents system started manually")
+        return {"success": True, "message": "Agents started successfully"}
+    except Exception as e:
+        logger.error(f"Failed to start agents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/stop")
+async def stop_agents():
+    """Manually stop autonomous agents system"""
+    try:
+        await autonomous_agent_orchestrator.stop()
+        logger.info("Autonomous agents system stopped manually")
+        return {"success": True, "message": "Agents stopped successfully"}
+    except Exception as e:
+        logger.error(f"Failed to stop agents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Health check
 @router.get("/health")
 async def health_check():
