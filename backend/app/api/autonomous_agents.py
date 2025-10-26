@@ -55,25 +55,25 @@ class AgentMetricsResponse(BaseModel):
     error: Optional[str] = None
 
 
-# Startup and shutdown events
-@router.on_event("startup")
-async def startup_autonomous_agents():
-    """Start autonomous agents system on startup"""
-    try:
-        await autonomous_agent_orchestrator.start()
-        logger.info("Autonomous agents system started")
-    except Exception as e:
-        logger.error(f"Failed to start autonomous agents: {e}")
+# Startup and shutdown events - DISABLED to prevent startup failures
+# @router.on_event("startup")
+# async def startup_autonomous_agents():
+#     """Start autonomous agents system on startup"""
+#     try:
+#         await autonomous_agent_orchestrator.start()
+#         logger.info("Autonomous agents system started")
+#     except Exception as e:
+#         logger.error(f"Failed to start autonomous agents: {e}")
 
 
-@router.on_event("shutdown")
-async def shutdown_autonomous_agents():
-    """Stop autonomous agents system on shutdown"""
-    try:
-        await autonomous_agent_orchestrator.stop()
-        logger.info("Autonomous agents system stopped")
-    except Exception as e:
-        logger.error(f"Failed to stop autonomous agents: {e}")
+# @router.on_event("shutdown")
+# async def shutdown_autonomous_agents():
+#     """Stop autonomous agents system on shutdown"""
+#     try:
+#         await autonomous_agent_orchestrator.stop()
+#         logger.info("Autonomous agents system stopped")
+#     except Exception as e:
+#         logger.error(f"Failed to stop autonomous agents: {e}")
 
 
 # Health check
