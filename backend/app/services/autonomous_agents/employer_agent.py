@@ -112,7 +112,8 @@ Policy:
     
     async def _subscribe_to_events(self):
         """Subscribe to employer-related events"""
-        await event_bus.subscribe(
+        # subscribe is synchronous in EventBus
+        self.event_bus.subscribe(
             agent_id=self.agent_id,
             event_types=[
                 EventType.EMPLOYER_VIEWED_CANDIDATE,
@@ -124,7 +125,8 @@ Policy:
     
     async def _unsubscribe_from_events(self):
         """Unsubscribe from events"""
-        await event_bus.unsubscribe(
+        # unsubscribe is synchronous in EventBus
+        self.event_bus.unsubscribe(
             agent_id=self.agent_id,
             event_types=[
                 EventType.EMPLOYER_VIEWED_CANDIDATE,

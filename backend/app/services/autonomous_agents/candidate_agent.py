@@ -113,7 +113,8 @@ Policy:
     
     async def _subscribe_to_events(self):
         """Subscribe to candidate-related events"""
-        await event_bus.subscribe(
+        # subscribe is synchronous in EventBus
+        self.event_bus.subscribe(
             agent_id=self.agent_id,
             event_types=[
                 EventType.CANDIDATE_APPLIED,
@@ -125,7 +126,8 @@ Policy:
     
     async def _unsubscribe_from_events(self):
         """Unsubscribe from events"""
-        await event_bus.unsubscribe(
+        # unsubscribe is synchronous in EventBus
+        self.event_bus.unsubscribe(
             agent_id=self.agent_id,
             event_types=[
                 EventType.CANDIDATE_APPLIED,
@@ -173,7 +175,7 @@ Policy:
         result = await self._run_workflow(workflow_input)
         
         # Publish feedback ready event
-        await event_bus.publish_simple(
+        await self.event_bus.publish_simple(
             event_type=EventType.CANDIDATE_FEEDBACK_READY,
             payload={
                 "candidate_id": candidate_data.get("id"),
