@@ -44,6 +44,11 @@ class VectorStore:
     async def initialize_collection(self):
         """Create collection if it doesn't exist"""
         try:
+            # Skip Qdrant if credentials are missing
+            if not os.getenv("QDRANT_URL") or not os.getenv("QDRANT_API_KEY"):
+                logger.warning("QDRANT credentials not set, skipping collection initialization")
+                return
+                
             collections = self.client.get_collections()
             collection_names = [col.name for col in collections.collections]
             
@@ -60,7 +65,9 @@ class VectorStore:
                 logger.info(f"Collection {self.collection_name} already exists")
         except Exception as e:
             logger.error(f"Error initializing collection: {e}")
-            raise
+            # Don't raise if credentials are missing
+            if "forbidden" not in str(e).lower() or (os.getenv("QDRANT_URL") and os.getenv("QDRANT_API_KEY")):
+                raise
     
     async def generate_embedding(self, text: str) -> List[float]:
         """Generate embedding for text using OpenAI"""
