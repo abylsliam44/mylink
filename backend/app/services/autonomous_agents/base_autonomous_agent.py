@@ -20,14 +20,6 @@ from .event_bus import Event
 from ..rag.rag_service import RAGService
 from ..ai.llm_client import get_llm
 
-# Import event_bus from event_bus module to avoid circular imports
-def get_event_bus():
-    """Get event_bus instance"""
-    from .event_bus import event_bus
-    return event_bus
-
-event_bus = get_event_bus()
-
 logger = logging.getLogger(__name__)
 
 
@@ -41,6 +33,8 @@ class BaseAutonomousAgent(ABC):
         model_name: str = "gpt-4o-mini",
         temperature: float = 0.2
     ):
+        from .event_bus import event_bus
+        self.event_bus = event_bus
         self.agent_type = agent_type
         self.agent_name = agent_name
         self.model_name = model_name
@@ -286,7 +280,7 @@ Language: {self.state.context.language}"""
                 return
             
             # Publish health check event
-            await event_bus.publish_simple(
+            await self.event_bus.publish_simple(
                 event_type=EventType.AGENT_HEALTH_CHECK,
                 payload={
                     "agent_id": self.agent_id,
