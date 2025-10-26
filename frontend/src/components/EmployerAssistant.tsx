@@ -86,9 +86,23 @@ export default function EmployerAssistant({ vacancyId, onClose }: { vacancyId: s
     const list = (r.data as any[]).slice().sort((a, b) => (b.relevance_score || 0) - (a.relevance_score || 0))
     if (!list.length) { await typeAssistant('Пока нет откликов для анализа.'); return }
     const top = list[0]
+    
+    // Run pipeline if no analysis exists yet
     if (!top.rejection_reasons) {
-      try { await api.post('/ai/pipeline/screen_by_ids', { vacancy_id: vacancyId, candidate_id: top.candidate_id, response_id: top.id, limits: { max_questions: 0 } }, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } }) } catch {}
+      await typeAssistant('Запускаю анализ кандидата...')
+      try { 
+        await api.post('/ai/pipeline/screen_by_ids', { 
+          vacancy_id: vacancyId, 
+          candidate_id: top.candidate_id, 
+          response_id: top.id, 
+          limits: { max_questions: 0 } 
+        }, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })
+      } catch (e) {
+        await typeAssistant('Ошибка анализа. Попробуйте позже.')
+        return
+      }
     }
+    
     const refreshed = (await api.get(`/responses?vacancy_id=${vacancyId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } })).data as any[]
     const best = refreshed.find(x => x.id === top.id) || top
     const pos = (best.rejection_reasons?.summary?.positives || []).slice(0, 3).join('; ') || '—'

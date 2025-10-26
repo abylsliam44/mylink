@@ -208,7 +208,18 @@ export default function EmployerAdmin() {
                   <td className="py-2 pr-2">{v.location}</td>
                   <td className="py-2 pr-2">{[v.salary_min, v.salary_max].filter(Boolean).join('—') || '—'}</td>
                   <td className="py-2 pr-2">
-                    <button className="btn-outline" onClick={() => setActiveVacancyId(v.id)}>Отклики</button>
+                    <button 
+                      className="btn-outline" 
+                      onClick={() => {
+                        setActiveVacancyId(v.id)
+                        // Force reload if same vacancy selected
+                        if (activeVacancyId === v.id) {
+                          loadResponses(v.id).catch(() => {})
+                        }
+                      }}
+                    >
+                      Отклики
+                    </button>
                   </td>
                 </tr>
               ))}
