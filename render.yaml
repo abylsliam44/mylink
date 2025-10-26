@@ -3,8 +3,13 @@ services:
     name: smartbot-backend
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install --cache-dir /tmp/pip-cache -r requirements.txt && rm -rf /tmp/pip-cache
+    startCommand: |
+      echo "🚀 Starting SmartBot Backend..."
+      echo "📊 Running database migrations..."
+      alembic upgrade head || echo "⚠️ Migration failed, continuing..."
+      echo "🌐 Starting server..."
+      uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
@@ -56,6 +61,8 @@ services:
         fromDatabase:
           name: smartbot-db
           property: connectionString
+      - key: PORT
+        value: "10000"
 
 databases:
   - name: smartbot-db
