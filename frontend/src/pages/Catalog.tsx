@@ -408,13 +408,19 @@ export default function Catalog() {
       
       try {
         const response = await api.post('/responses', { candidate_id: cid, vacancy_id: selectedVacancy.id })
-        setResponseId(response.data.id)
+        const newResponseId = response.data.id
+        setResponseId(newResponseId)
         // Store response_id with vacancy_id as key
         try { 
-          localStorage.setItem(`response_${cid}_${selectedVacancy.id}`, response.data.id)
-          console.log('Saved new response to localStorage:', response.data.id)
+          localStorage.setItem(`response_${cid}_${selectedVacancy.id}`, newResponseId)
+          console.log('Saved new response to localStorage:', newResponseId)
         } catch {}
-        showSuccess('Отклик отправлен!', 'Спасибо! Теперь вы можете пройти мини-собеседование.')
+        showSuccess('Отклик отправлен!', 'Спасибо! Сейчас откроется мини-собеседование с AI ботом.')
+        
+        // Auto-open chat after successful application
+        setTimeout(() => {
+          setShowPreChat(true)
+        }, 1500)
       } catch (responseError: any) {
         console.error('Response creation error:', responseError)
         if (responseError.response?.status === 400 && responseError.response?.data?.detail?.includes('already exists')) {
@@ -547,7 +553,7 @@ export default function Catalog() {
                 <div className="text-[12px] text-grayx-600">Резюме загружено. ID: {candidateId}</div>
               )}
               {candidateId && !hasUploadedResume && (
-                <div className="text-[12px] text-orange-600">Профиль создан, но резюме не загружено. Загрузите PDF для полного анализа.</div>
+                <div className="text-[12px] text-orange-600">⚠️ Резюме не загружено. Загрузите PDF-файл для точного AI-анализа.</div>
               )}
               {resumeSnippet && hasUploadedResume && (
                 <div className="mt-3 text-[12px] text-grayx-600 max-h-40 overflow-auto border rounded p-2 bg-grayx-50">{resumeSnippet}</div>
