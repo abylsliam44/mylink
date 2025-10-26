@@ -7,8 +7,14 @@ from typing import Dict, Any, List, Optional, TypedDict
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_openai import ChatOpenAI
-from langchain_community.vectorstores import Qdrant
-from qdrant_client import QdrantClient
+try:
+    from langchain_community.vectorstores import Qdrant  # type: ignore
+    from qdrant_client import QdrantClient  # type: ignore
+    _QDRANT_AVAILABLE = True
+except Exception:
+    Qdrant = None  # type: ignore
+    QdrantClient = None  # type: ignore
+    _QDRANT_AVAILABLE = False
 import json
 import logging
 
@@ -30,7 +36,7 @@ class BaseAgent(ABC):
     def __init__(self, name: str, llm_model: str = "gpt-4o-mini"):
         self.name = name
         self.llm = ChatOpenAI(model=llm_model, temperature=0.2)
-        self.qdrant_client = QdrantClient(host="qdrant", port=6333)
+        self.qdrant_client = QdrantClient(host="qdrant", port=6333) if _QDRANT_AVAILABLE else None
         self.vector_store = None
         self.graph = None
         self._setup_vector_store()
@@ -38,6 +44,9 @@ class BaseAgent(ABC):
     
     def _setup_vector_store(self):
         """Setup Qdrant vector store"""
+        if not _QDRANT_AVAILABLE:
+            self.vector_store = None
+            return
         try:
             from langchain_openai import OpenAIEmbeddings
             embeddings = OpenAIEmbeddings()
