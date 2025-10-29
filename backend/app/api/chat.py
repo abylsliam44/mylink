@@ -145,15 +145,18 @@ async def chat_websocket(
                 response.status = ResponseStatus.IN_CHAT
                 await db.flush()
 
+                print(f"🚀 Starting new interview for response {response_id}")
                 # Start interview with AI analysis
                 interview_result = await interview_service.start_interview(
                     response_id=response_id,
                     db=db,
                     language=getattr(response, 'language_preference', None) or "ru"
                 )
+                print(f"🎯 Interview result received: {len(interview_result.get('questions', []))} questions")
 
                 interview_questions = interview_result["questions"]
                 current_question_index = 0
+                print(f"📊 Total questions: {len(interview_questions)}")
 
                 # Create or get chat session
                 if not response.chat_session:
@@ -176,6 +179,7 @@ async def chat_websocket(
                     )
                     await db.commit()
 
+                    print(f"📤 Sending first question to WebSocket: {question_text[:50]}...")
                     await websocket.send_json({
                         "type": "bot_message",
                         "message": question_text,
@@ -183,13 +187,16 @@ async def chat_websocket(
                         "total_questions": len(interview_questions),
                         "progress": f"Вопрос {current_question_index + 1} из {len(interview_questions)}"
                     })
+                    print(f"✅ First question sent successfully")
                 else:
                     # No questions generated - inform user but keep connection open
+                    print(f"ℹ️  No questions generated, sending info message")
                     await websocket.send_json({
                         "type": "info",
                         "message": interview_result.get("closing_message", "Все данные уже заполнены. Ожидаем решения HR."),
                     })
                     await db.commit()
+                    print(f"✅ Info message sent")
 
             # Listen for candidate messages
             while True:
@@ -311,8 +318,9 @@ async def chat_websocket(
                             "progress": f"Вопрос {current_question_index + 1} из {len(interview_questions)}",
                             "current_score": relevance_result["relevance_score"]
                         })
-
-            break  # Exit the async for loop
+            
+            # Keep DB session alive until WebSocket closes
+            break
 
     except WebSocketDisconnect:
         # Client disconnected

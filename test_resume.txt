@@ -1,7 +1,0 @@
-Иван Иванов
-Python Developer
-Опыт работы: 3 года
-Навыки: Python, FastAPI, PostgreSQL, Docker
-Образование: Бакалавр информатики
-Город: Алматы
-Email: ivan@example.com

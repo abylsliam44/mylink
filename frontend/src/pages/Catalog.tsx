@@ -5,6 +5,7 @@ import NotificationContainer from '../components/NotificationContainer'
 import LoadingSpinner from '../components/LoadingSpinner'
 import AnimatedBackground from '../components/AnimatedBackground'
 import PageTransition from '../components/PageTransition'
+import PDFUploadZone from '../components/PDFUploadZone'
 
 type Vacancy = {
   id: string
@@ -115,12 +116,46 @@ export default function Catalog() {
     api.get(`/responses/candidate/${candidateId}/vacancy/${selectedVacancyId}`)
       .then(r => {
         if (r.data && r.data.id) {
-          setResponseId(r.data.id)
+          const respId = r.data.id
+          setResponseId(respId)
           // Store response_id with vacancy_id as key
           try { 
-            localStorage.setItem(`response_${candidateId}_${selectedVacancyId}`, r.data.id)
-            console.log('Found existing response:', r.data.id)
+            localStorage.setItem(`response_${candidateId}_${selectedVacancyId}`, respId)
+            console.log('Found existing response:', respId)
           } catch {}
+          // Connect WebSocket AFTER we have response_id
+          setTimeout(() => {
+            if (respId) {
+              const url = wsUrl(`/ws/chat/${respId}`)
+              const ws = new WebSocket(url)
+              wsRef.current = ws
+              
+              ws.onopen = () => {
+                setMessages(prev => [...prev, { sender: 'bot', text: 'Соединение установлено. Ожидание вопросов...' }])
+              }
+              ws.onmessage = async (event) => {
+                try {
+                  const data = JSON.parse(event.data)
+                  if (data.type === 'bot_message' && data.message) {
+                    await typeBotMessage(data.message)
+                  } else if (data.type === 'info') {
+                    await typeBotMessage(data.message)
+                  } else if (data.type === 'chat_ended') {
+                    setChatState(prev => ({ ...prev, isCompleted: true }))
+                  }
+                } catch (e) {
+                  console.error('WS parse error:', e)
+                }
+              }
+              ws.onerror = (e) => {
+                console.error('WS error:', e)
+                setMessages(prev => [...prev, { sender: 'bot', text: 'Ошибка подключения' }])
+              }
+              ws.onclose = () => {
+                console.log('WS closed')
+              }
+            }
+          }, 200)
         } else {
           setResponseId(null)
         }
@@ -158,6 +193,42 @@ export default function Catalog() {
   }, [vacancies, tab, query])
 
   const selectedVacancy = filtered.find(v => v.id === selectedVacancyId) || filtered[0]
+
+  // Upload PDF for existing candidate
+  const uploadPdfForExisting = async (file: File) => {
+    if (!candidateId) {
+      showError('Ошибка', 'Сначала откликнитесь на вакансию')
+      return
+    }
+    setBusy(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await api.post(`/candidates/${candidateId}/upload_pdf`, form, { 
+        headers: { 'Content-Type': 'multipart/form-data' } 
+      })
+      const snippet = (res.data.resume_text || res.data.cv_text || '').slice(0, 400)
+      try {
+        localStorage.setItem('candidate_resume_snippet', snippet)
+        setResumeSnippet(snippet)
+        setHasUploadedResume(true)
+      } catch {}
+      showSuccess('PDF загружен!', 'Резюме успешно обработано через OCR.')
+    } catch (e: any) {
+      console.error('PDF upload error:', e)
+      if (e.response?.status === 400) {
+        showError('Ошибка загрузки', e.response.data?.detail || 'Некорректный формат файла')
+      } else if (e.response?.status === 413) {
+        showError('Файл слишком большой', 'Размер файла превышает допустимый лимит')
+      } else if (e.response?.status === 503) {
+        showError('OCR недоступен', 'Функция распознавания PDF временно недоступна. Заполните резюме вручную.')
+      } else {
+        showError('Ошибка загрузки', 'Не удалось загрузить PDF.')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
 
   // Upload PDF -> create candidate and store id
   const uploadResume = async () => {
@@ -553,7 +624,13 @@ export default function Catalog() {
                 <div className="text-[12px] text-grayx-600">Резюме загружено. ID: {candidateId}</div>
               )}
               {candidateId && !hasUploadedResume && (
-                <div className="text-[12px] text-orange-600">⚠️ Резюме не загружено. Загрузите PDF-файл для точного AI-анализа.</div>
+                <div className="space-y-3">
+                  <div className="text-[12px] text-orange-600">⚠️ Резюме не загружено. Загрузите PDF-файл для точного AI-анализа.</div>
+                  <PDFUploadZone
+                    onFileSelect={(file) => uploadPdfForExisting(file)}
+                    disabled={busy}
+                  />
+                </div>
               )}
               {resumeSnippet && hasUploadedResume && (
                 <div className="mt-3 text-[12px] text-grayx-600 max-h-40 overflow-auto border rounded p-2 bg-grayx-50">{resumeSnippet}</div>

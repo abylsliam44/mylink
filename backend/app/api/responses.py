@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Optional
 from uuid import UUID
+import httpx
 
 from app.db.session import get_db
 from app.schemas.response import ResponseCreate, ResponseResponse, ResponseListItem
@@ -129,6 +130,23 @@ async def create_response(
     except Exception as e:
         # Log error but don't fail the response creation
         print(f"Autonomous agent integration error: {e}")
+    
+    # Send event to n8n workflow (async, non-blocking)
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(
+                "http://n8n:5678/webhook/candidate-applied",
+                json={
+                    "vacancy_id": str(new_response.vacancy_id),
+                    "candidate_id": str(new_response.candidate_id),
+                    "response_id": str(new_response.id),
+                    "employer_id": str(vacancy.employer_id)
+                }
+            )
+            print(f"✅ n8n webhook triggered for response {new_response.id}")
+    except Exception as e:
+        # Log error but don't fail the response creation
+        print(f"⚠️  n8n webhook error (non-critical): {e}")
     
     return new_response
 

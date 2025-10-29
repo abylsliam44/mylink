@@ -103,6 +103,50 @@ async def upload_candidate_pdf(
     return cand
 
 
+@router.post("/{candidate_id}/upload_pdf")
+async def upload_pdf_for_candidate(
+    candidate_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Upload PDF resume for existing candidate with OCR"""
+    result = await db.execute(select(Candidate).where(Candidate.id == candidate_id))
+    candidate = result.scalar_one_or_none()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    
+    if not file.filename or not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    
+    try:
+        pdf_bytes = await file.read()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Ошибка чтения файла: {e}")
+    
+    try:
+        from pdf2image import convert_from_bytes
+        import pytesseract
+        
+        pages = convert_from_bytes(pdf_bytes, dpi=150)
+        text = ""
+        for page_img in pages:
+            text += pytesseract.image_to_string(page_img, lang='rus+eng') + "\n"
+        text = text.strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="PDF не содержит текста")
+    except ImportError:
+        raise HTTPException(status_code=503, detail="OCR временно недоступен. Попробуйте позже.")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Ошибка обработки PDF: {e}")
+    
+    # Update candidate resume
+    candidate.resume_text = text[:20000]
+    await db.commit()
+    await db.refresh(candidate)
+    
+    return {"id": candidate.id, "resume_text": candidate.resume_text, "message": "PDF успешно загружен и обработан"}
+
+
 @router.get("/{candidate_id}", response_model=CandidateResponse)
 async def get_candidate(
     candidate_id: UUID,
